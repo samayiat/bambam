@@ -2568,27 +2568,32 @@ function drawStrikeWarning(){
   ctx.restore(); ctx.globalAlpha=1;
 }
 
+// boss backup, reskinned as a living eviction notice — a served sheet with legs, angry
+// eyes, and a red stamp, matching Landlord D. Evict's paper-projectile color/lettering.
 function drawSammich(e){ const sx=e.x-camX, y=e.z-e.y, bob=Math.sin(e.anim*2)*1.6, f=e.face;
   shadow(e.x,e.z,12);
   const hit=e.flash>3||e.hitstun>0;
-  const bread=hit?'#fff':'#d9a441', crust=hit?'#eee':'#a9711f';
+  const paper=hit?'#fff':'#efe9d8', fold=hit?'#eee':'#d9d0ba', ink=hit?'#ccc':'#b3aa98';
   // stubby legs marching
   const lg=Math.sin(e.anim*3)*2;
   ctx.fillStyle='#4a3620'; ctx.fillRect(sx-6,y-6,3,6+lg); ctx.fillRect(sx+3,y-6,3,6-lg);
-  // bottom bun
-  ctx.fillStyle=crust; ctx.fillRect(sx-10,y-18+bob,20,6);
-  // fillings
-  ctx.fillStyle='#4faa4a'; ctx.fillRect(sx-11,y-21+bob,22,3);   // lettuce
-  ctx.fillStyle='#a83c3c'; ctx.fillRect(sx-10,y-24+bob,20,4);   // meat
-  ctx.fillStyle='#e8c33a'; ctx.fillRect(sx-9,y-26+bob,18,2);    // cheese
-  // top bun (domed)
-  ctx.fillStyle=bread; ctx.beginPath(); ctx.moveTo(sx-11,y-25+bob);
-  ctx.quadraticCurveTo(sx,y-37+bob,sx+11,y-25+bob); ctx.closePath(); ctx.fill();
-  // sesame + angry eyes
-  ctx.fillStyle='#fff8e0'; ctx.fillRect(sx-5,y-31+bob,1.5,1.5); ctx.fillRect(sx+3,y-32+bob,1.5,1.5);
-  ctx.fillStyle='#fff'; ctx.fillRect(sx-6,y-30+bob,4,4); ctx.fillRect(sx+2,y-30+bob,4,4);
-  ctx.fillStyle='#1a1010'; ctx.fillRect(sx-5+f,y-29+bob,2,2); ctx.fillRect(sx+3+f,y-29+bob,2,2);
-  if(e.state==='atk'){ ctx.fillStyle='#1a1010'; ctx.fillRect(sx-3,y-21+bob,6,2); }   // gnashing mouth
+  // the sheet itself, standing on end with a dog-eared top corner
+  ctx.fillStyle=paper; ctx.beginPath();
+  ctx.moveTo(sx-11,y-9+bob); ctx.lineTo(sx-11,y-33+bob); ctx.lineTo(sx+4,y-33+bob);
+  ctx.lineTo(sx+11,y-26+bob); ctx.lineTo(sx+11,y-9+bob); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=fold; ctx.beginPath();
+  ctx.moveTo(sx+4,y-33+bob); ctx.lineTo(sx+4,y-26+bob); ctx.lineTo(sx+11,y-26+bob); ctx.closePath(); ctx.fill();
+  // lines of legalese
+  ctx.fillStyle=ink;
+  for(let i=0;i<4;i++) ctx.fillRect(sx-8,y-29+i*4+bob,14,1.4);
+  // red eviction stamp, canted like it was slapped on in a hurry
+  ctx.save(); ctx.translate(sx-2,y-16+bob); ctx.rotate(-0.3);
+  ctx.globalAlpha=hit?1:0.85; ctx.fillStyle='#e0344a'; ctx.fillRect(-7,-3,14,6);
+  ctx.restore(); ctx.globalAlpha=1;
+  // angry eyes, gnashing when it attacks — this paperwork hates you personally
+  ctx.fillStyle='#fff'; ctx.fillRect(sx-6,y-23+bob,4,4); ctx.fillRect(sx+2,y-23+bob,4,4);
+  ctx.fillStyle='#1a1010'; ctx.fillRect(sx-5+f,y-22+bob,2,2); ctx.fillRect(sx+3+f,y-22+bob,2,2);
+  if(e.state==='atk'){ ctx.fillStyle='#1a1010'; ctx.fillRect(sx-3,y-14+bob,6,2); }   // gnashing mouth
   if(e.hp<e.maxhp && !e.dead) ebar(e,18,y-40+bob);
 }
 
