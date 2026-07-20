@@ -1487,7 +1487,7 @@ function connect(e,s){
   let smash = 0.03+(crit?0.22:0)+(s.launch?0.16:0);
   if(e.hp<=0 || Math.random()<smash){
     if(e.hp>0 && Math.random()<0.5) e.hp=0;
-    if(e.k!=='rat'){ tooth(e.x,e.z); say(e.x,e.z,'SMASH','#ffb545'); shake=8; hitstop=Math.max(hitstop,10);
+    if(e.k!=='rat'){ tooth(e.x,e.z); shake=8; hitstop=Math.max(hitstop,10);
       rumble(380,1,1,true); }
   }
   if(e.hp<=0 && !e.dead){ e.dead=1;
@@ -1980,6 +1980,7 @@ function update(){
         if(Math.abs(f.x-e.x)<f.r*0.8+e.w && Math.abs(f.z-e.z)<f.r*0.6+e.d){
           if(e.k==='boss' && bossInv(e)){ f.gone=true; e.flash=3; break; }   // shielded mid-move
           const fd=f.dmg || (f.r>7?11:7); e.hp-=fd; e.flash=8;
+          if(f.dot) say(e.x,e.z-e.h*0.6,'POW','#ffe066');   // finger guns — the only comic-text hit callout for now
           if(f.weapon){ const w=WEAPONS[f.weapon]; shake=Math.max(shake,7); hitstop=Math.max(hitstop,8); rumble(300,.9,.7,true);
             puff(e.x,e.z,e.h*0.5,10,w.col); blip(200,.06);
             if(e.k!=='boss' && f.wlaunch){ e.state='launch'; e.hitstun=30; e.vx=P.face*8; e.vy=3.0; }   // a thrown pipe knocks 'em flying
