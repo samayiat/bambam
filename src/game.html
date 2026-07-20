@@ -55,7 +55,7 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch
 #pauseBtn{position:absolute;left:50%;top:2.5%;opacity:0;pointer-events:none;transition:opacity .2s;transform:translateX(-50%);width:34px;height:22px;border-radius:4px;
   border:1px solid #2f2b3d;background:rgba(15,13,22,.6);display:flex;align-items:center;justify-content:center;
   color:var(--dim);font-size:11px;pointer-events:auto;letter-spacing:.1em}
-/* title mode gate — pick SOLO or CO-OP before any game (and its network handshake) starts */
+/* title mode gate — press start, straight into solo play (no mode choice anymore) */
 #startMenu{position:absolute;left:0;right:0;top:53%;display:none;flex-direction:column;
   align-items:center;gap:1.8vmin;z-index:15;pointer-events:none}
 #startMenu.on{display:flex}
@@ -65,8 +65,6 @@ canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges;touch
   border:1px solid #2f2b3d;border-radius:6px;padding:.28em 1.1em;cursor:pointer;
   -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);line-height:1;transition:.12s}
 .startBtn:hover,.startBtn:active{color:#fff3d6;border-color:var(--sodium);background:rgba(255,181,69,.16)}
-.startBtn.coop{color:var(--sodium)}
-.startBtn.coop:hover,.startBtn.coop:active{color:#ffd6e8;border-color:var(--club);background:rgba(255,46,136,.18)}
 #startHint{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.14em;color:#5c5670}
 
 
@@ -255,10 +253,9 @@ kbd{background:#191725;border:1px solid #2f2b3d;border-bottom-width:2px;border-r
       </div>
       <div id="startMenu">
         <div id="startRow">
-          <button class="startBtn" id="btnSolo">SOLO</button>
-          <button class="startBtn coop" id="btnCoop">CO-OP</button>
+          <button class="startBtn" id="btnStart">START</button>
         </div>
-        <div id="startHint">TAP · ANY KEY / A = SOLO&nbsp;&nbsp;·&nbsp;&nbsp;C / Y = CO-OP</div>
+        <div id="startHint">TAP · ANY KEY / A TO START</div>
       </div>
     </div>
   </div>
@@ -496,8 +493,7 @@ function anotherRound(){ $('recap').classList.remove('on'); reset(); setPause(fa
 $('recapAgain').onclick=anotherRound;
 $('resume').onclick=()=>setPause(false);
 $('pauseBtn').onclick=()=>setPause(!paused);
-$('btnSolo').onclick=()=>chooseMode(false);
-$('btnCoop').onclick=()=>chooseMode(true);
+$('btnStart').onclick=()=>chooseMode(false);
 $('d_freedom').onclick=()=>P.freedom=P.maxFreedom;
 $('d_xp').onclick=()=>gainXp(50);
 $('d_cash').onclick=()=>P.bucks+=100;
@@ -518,9 +514,8 @@ $('shopList').addEventListener('click',e=>{ const it=e.target.closest('.item'); 
 const key={}, pressed={};
 addEventListener('keydown',e=>{
   if(mode==='title'){
-    if(e.code==='KeyC'){ chooseMode(true); e.preventDefault(); return; }   // C = co-op
     if(e.code==='Escape') return;
-    chooseMode(false); e.preventDefault(); return;                         // any other key = solo
+    chooseMode(false); e.preventDefault(); return;                         // any key = start (solo)
   }
   if(e.code==='Escape'||e.code==='KeyP'){setPause(!paused);return;}
   if(!key[e.code])pressed[e.code]=true; key[e.code]=true;
@@ -3083,64 +3078,25 @@ function spaced(g,txt,cx,y,sp){
 }
 const BEBAS='"Bebas Neue", Impact, "Arial Narrow", sans-serif';
 
+// just the name — pink letters on a flat blue background, no level behind it
 function titleCard(g){
   g.save();
-  const th=thud();
-  // busted-neon flicker, same trick as the club signs — the title is part of the block
-  const fl = hsh(Math.floor(t/6)*3.1)<0.055 ? 0.22 : 1;
-
-  g.globalCompositeOperation='lighter';
-  g.globalAlpha=0.17*fl*(0.55+0.45*th);
-  const glow=g.createRadialGradient(W/2,84,8,W/2,84,210);
-  glow.addColorStop(0,'#ffb545'); glow.addColorStop(.5,'rgba(255,90,46,.5)'); glow.addColorStop(1,'rgba(255,46,136,0)');
-  g.fillStyle=glow; g.fillRect(0,0,W,190);
-  g.globalCompositeOperation='source-over'; g.globalAlpha=1;
-
   g.textAlign='center'; g.textBaseline='alphabetic';
-  g.font='400 62px '+BEBAS;
-  const jit=(1-fl)*rnd(-1,1);
-  g.globalAlpha=.5*fl;  g.fillStyle='#ff2e88'; spaced(g,'BAMBAM',W/2+3+jit,101,7);
-  g.globalAlpha=.38*fl; g.fillStyle='#3ad1ff'; spaced(g,'BAMBAM',W/2-3+jit,99,7);
-  g.globalAlpha=fl;     g.fillStyle='#fff3d6'; spaced(g,'BAMBAM',W/2+jit,100,7);
-  g.globalAlpha=1;
-
-  g.fillStyle='rgba(255,181,69,.45)'; g.fillRect(W/2-116,110,232,1);
-
-  g.font='bold 8px "JetBrains Mono",monospace'; g.fillStyle='#c9d13a';
-  spaced(g,'WARRIOR OF LIBERATION',W/2,126,1.6);
-  g.font='7px "JetBrains Mono",monospace'; g.fillStyle='#7a7391';
-  spaced(g,'and the less you land',W/2,138,1);
-
-  // the SOLO / CO-OP buttons (DOM #startMenu) are the start affordance now — the mode
-  // choice has to land before any game boots, so the title no longer self-starts on input.
-  if(bestScore>0){ g.fillStyle='#ffb545'; g.font='7px "JetBrains Mono",monospace';
-    spaced(g,'BEST NIGHT  '+bestScore,W/2,150,1.4); }
+  g.font='400 64px '+BEBAS; g.fillStyle='#ff2e88';
+  spaced(g,'STARDUST',W/2,98,5);
+  spaced(g,'BREAKER',W/2,160,5);
   g.restore();
 }
 
 function titleRender(){
-  ctx.save();
-  bg();
-  const list=[];
-  for(const cw of crowd) list.push({z:cw.z,f:()=>drawCrowd(cw)});
-  for(const c of cans) if(!c.dead) list.push({z:c.z,f:()=>drawCan(c)});
-  for(const pr of props) list.push({z:pr.z,f:()=>drawProp(pr)});
-  list.push({z:P.z,f:drawPlayer});
-  list.sort((a,b)=>a.z-b.z);
-  for(const o of list) o.f();
-  for(const pt of parts){ ctx.globalAlpha=clamp(pt.life/20,0,1); ctx.fillStyle=pt.col;
-    ctx.fillRect(pt.x-camX,pt.z-pt.y,2,2); } ctx.globalAlpha=1;
-  drawLitter(); drawCars();
-  ctx.restore();
-  composite();          // the street rolls, ghosts and warps...
-  titleCard(dctx);      // ...the sign doesn't.
+  dctx.fillStyle='#1a2fd8'; dctx.fillRect(0,0,W,H);
+  titleCard(dctx);
 }
 
-// The title is a mode gate: the FIRST thing that happens is a solo-vs-co-op choice.
-// Nothing calls startGame()/reset() until a mode is picked, so co-op's network handshake
-// (insertCoin) either runs to completion BEFORE the game boots, or not at all — a game is
-// never started and then has a mode grafted onto it. `starting` latches on the first pick
-// so a double-tap can't fire insertCoin twice while it's still awaiting.
+// Press start -> straight into solo play; no mode choice on the title screen anymore.
+// chooseMode still takes a coop flag (startCoop() is still there, just unreached from the
+// UI for now) so it doesn't need touching if co-op's ever wired back into the title.
+// `starting` latches on the first press so a double-tap can't fire this twice.
 let starting=false;
 function chooseMode(coop){
   if(mode!=='title'||starting) return;
@@ -3193,8 +3149,7 @@ function loop(now){ requestAnimationFrame(loop);
   if(mode==='title'){
     while(acc>=1/60){ titleTick(); acc-=1/60; }
     const gp = PAD.idx!==null ? navigator.getGamepads()[PAD.idx] : null;
-    if(gp){ if(gp.buttons[3]&&gp.buttons[3].pressed) chooseMode(true);       // Y = co-op
-            else if(gp.buttons.some(b=>b&&b.pressed)) chooseMode(false); }   // any other = solo
+    if(gp && gp.buttons.some(b=>b&&b.pressed)) chooseMode(false);   // any button = start
     titleRender(); return;
   }
   if(dawnShown||continueOn||noticeOn||paused||shopOpen){ acc=0; render(); return; }
