@@ -680,7 +680,21 @@ function genChunk(ci){
   // (gate + lamp dropped — gate sprite has baked-in graffiti; lamps not wanted)
   for(let i=0;i<8;i++){ const ty=['tree','tree','tree','hydrant','bench','mailbox','sign','bench','newsbox','bikerack'][Math.floor(R()*10)];
     props.push({x:x0+30+R()*(CHUNK-60), z:FLOOR_N-2+R()*22, type:ty, ph:R()*9, chunk:ci}); }
-  for(let i=0;i<8;i++) crowd.push({x:x0+R()*CHUNK, z:FLOOR_N-9+R()*7, ph:R()*9, blob:true, chunk:ci});
+  // ambient foot traffic — background pedestrians who actually walk the block now that
+  // there's no car lane to dodge. Mostly sidewalk; a few jaywalk out into the wide road.
+  // Same 3 R() draws per entry as before (x, a placement roll, ph) so this doesn't shift
+  // the chunk's R() counter and change anything after it (GATES, below, reads R() next) —
+  // direction/speed instead come straight off hsh(), a pure per-value hash with no shared
+  // counter, so adding them can't perturb the RNG stream the rest of the sim depends on.
+  for(let i=0;i<8;i++){
+    const cx=x0+R()*CHUNK, zr=R(), zph=R();
+    const jaywalk = zr<0.15;
+    const z = jaywalk ? CURB+6+(zr/0.15)*(ROAD_TARGET-40-CURB)
+                       : FLOOR_N+6+((zr-0.15)/0.85)*(FLOOR_S-10-FLOOR_N);
+    const dir = hsh(ci*907.3+i*53.1+11.7)<0.5?-1:1;
+    const spd = 0.25+hsh(ci*617.9+i*29.3+3.7)*0.35;
+    crowd.push({x:cx, z, ph:zph*9, blob:true, chunk:ci, vx:dir*spd});
+  }
   if(ci>0) { const gx = x0+240+R()*280; GATES.push({x:gx, done:false, chunk:ci}); console.log("GATE created at x=" + gx + " chunk=" + ci); }
   CLUBS=BUILDINGS.filter(b=>b.kind==='club');
 }
@@ -1987,7 +2001,7 @@ function update(){
   //---- the crowd notices you
   const live=ents.filter(e=>!e.dead).length;
   for(const cw of crowd){ cw.ph+=0.03;
-    if(cw.blob) continue;
+    if(cw.blob){ cw.x+=cw.vx||0; continue; }   // just ambient foot traffic — no aggro, no collision
     // no invitation needed. get within a block and they're already coming. HOST-only in co-op:
     // these timers are local randoms, so a guest running them would aggro a different set.
     if(!coopGuest()){
@@ -2195,8 +2209,10 @@ function drawCrowd(cw){
   const sx=cw.x-camX; if(sx<-40||sx>W+40) return;
   const bob=Math.sin(cw.ph*1.6)*1.2 + (cw.flinch>0?-2:0);
   if(cw.blob){
+    const sw=Math.sin(cw.ph*1.6)*3;   // alternating legs sell the walk
     ctx.globalAlpha=.72; ctx.fillStyle='#6a5a8a';
-    ctx.fillRect(sx-7,cw.z-40+bob,14,40); ctx.beginPath();
+    ctx.fillRect(sx-3.5-sw,cw.z-14+bob,3,14); ctx.fillRect(sx+0.5+sw,cw.z-14+bob,3,14);
+    ctx.fillRect(sx-7,cw.z-40+bob,14,26); ctx.beginPath();
     ctx.ellipse(sx,cw.z-44+bob,6,6,0,0,7); ctx.fill(); ctx.globalAlpha=1; return;
   }
   ctx.globalAlpha=.3; ctx.fillStyle='#000';
@@ -3067,7 +3083,7 @@ function titleTick(){
   for(const b of BUILDINGS) if(b.open>0)b.open--;
   for(const g of GRATES) if(g.open>0)g.open--;
   camX+=0.14; stream(); ambient();
-  for(const cw of crowd) cw.ph+=0.03;
+  for(const cw of crowd){ cw.ph+=0.03; if(cw.blob) cw.x+=cw.vx||0; }
   // a door goes every so often, so the block looks like it's doing something
   if(titleT%200===0){ const c=CLUBS.filter(b=>Math.abs(b.doorX-camX-W/2)<W*0.5);
     if(c.length) c[Math.floor(Math.random()*c.length)].open=60; }
