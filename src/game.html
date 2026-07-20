@@ -354,8 +354,8 @@ function buildManifest(){
     const rg=g.createRadialGradient(256,300,20,256,300,300);
     rg.addColorStop(0,'rgba(255,46,136,.55)'); rg.addColorStop(1,'rgba(255,46,136,0)');
     g.fillStyle=rg; g.fillRect(0,0,512,512);
-    const p=IDX['hero.rot.south'];
-    g.drawImage(sheet,p[0]+30,p[1]+20,32,52, 152,120,208,338);
+    const p=IDX['hero.portrait']||IDX['hero.rot.south'];
+    g.drawImage(sheet,p[0],p[1],S,S, 96,96,320,320);
     const man={ name:'BamBam: Warrior of Liberation', short_name:'BamBam', start_url:'.', scope:'.',
       display:'fullscreen', orientation:'landscape', background_color:'#0b0a10',
       theme_color:'#ff2e88', description:"A 2D beat 'em up.",
@@ -2800,13 +2800,10 @@ function drawDrop(d){ const sx=d.x-camX, y=d.z-d.y; shadow(d.x,d.z,5);
     ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=gl*0.5; ctx.fillStyle='#fff'; ctx.fillRect(sx-2,y-7,3,3); ctx.restore();
     ctx.fillStyle='#ffb545'; ctx.font='7px "JetBrains Mono",monospace'; ctx.textAlign='center'; if(t%24<16) ctx.fillText('▲',sx,y-18); } }
 
-// the head crop, measured off hero.rot.south: cols 33-59, rows 23-48
-const PORT={sx:31,sy:22,w:30,h:28};
 function portrait(px,py,box){
-  const p=IDX['hero.rot.south'];
+  const p=IDX['hero.portrait']||IDX['hero.rot.south'];
   ctx.fillStyle='#0b0a10'; ctx.fillRect(px,py,box,box);
   ctx.save(); ctx.beginPath(); ctx.rect(px+1,py+1,box-2,box-2); ctx.clip();
-  const sw=0, nod=0;
   let tint=null,amt=0;
   if(P.state==='imagine'){ tint='#3ad1ff'; amt=.35+.3*Math.sin(P.st*.42); }
   if(P.hitFlash>0){ tint='#ff1a1a'; amt=.6+.4*Math.sin(P.hitFlash*1.1); }
@@ -2816,9 +2813,9 @@ function portrait(px,py,box){
     tctx.globalCompositeOperation='source-atop'; tctx.globalAlpha=amt;
     tctx.fillStyle=tint; tctx.fillRect(0,0,S,S); tctx.globalAlpha=1;
     tctx.globalCompositeOperation='source-over';
-    ctx.drawImage(tc,PORT.sx,PORT.sy,PORT.w,PORT.h, px+1+sw,py+1+nod,box-2,box-2);
+    ctx.drawImage(tc,0,0,S,S, px+1,py+1,box-2,box-2);
   } else {
-    ctx.drawImage(sheet,p[0]+PORT.sx,p[1]+PORT.sy,PORT.w,PORT.h, px+1+sw,py+1+nod,box-2,box-2);
+    ctx.drawImage(sheet,p[0],p[1],S,S, px+1,py+1,box-2,box-2);
   }
   ctx.restore();
   // frame, hot when something's happening to him
@@ -2855,15 +2852,17 @@ function hud(){
     ctx.restore(); ctx.textAlign='left'; }
 
   ctx.font='7px "JetBrains Mono",monospace';
-  // health — 4 hearts, each worth 2 half-heart units
-  const nHearts=Math.min(12,Math.ceil(P.maxhp/2));
-  for(let i=0;i<nHearts;i++){
-    const hx=LX+i*13, fill=clamp(P.hp-i*2,0,2);   // 0=empty, 1=half, 2=full
-    ctx.font='11px monospace'; ctx.textAlign='left';
-    ctx.fillStyle='#3a2030'; ctx.fillText('♥',hx,BY+9);
-    if(fill>0){ ctx.save(); ctx.beginPath(); ctx.rect(hx,BY-8,fill>=2?9:4.5,17); ctx.clip();
-      ctx.fillStyle= P.hitFlash>0?'#ff5a5a':'#ff2e88'; ctx.fillText('♥',hx,BY+9); ctx.restore(); }
-  }
+  // health — a battery-style bar (BamBam's own reference art), not hearts
+  const HY=BY-8, HH=15, HW=BW-10;
+  const hpPct=clamp(P.maxhp>0?P.hp/P.maxhp:0,0,1);
+  const hpCol = P.hitFlash>0?'#ff5a5a':'#008f00';
+  ctx.fillStyle='#0b0a10'; ctx.fillRect(LX-1,HY-1,HW+2,HH+2);        // case
+  ctx.fillStyle='#fff'; ctx.fillRect(LX+1,HY+1,HW-2,HH-2);            // empty charge
+  ctx.fillStyle=hpCol; ctx.fillRect(LX+1,HY+1,(HW-2)*hpPct,HH-2);     // charge
+  ctx.strokeStyle=hpCol; ctx.lineWidth=1; ctx.strokeRect(LX+1.5,HY+1.5,HW-3,HH-3);
+  ctx.fillStyle='#0b0a10'; ctx.fillRect(LX+HW+1,HY+HH*0.26,4,HH*0.48);   // terminal nub
+  ctx.fillStyle='#0b0a10'; ctx.font='bold 7px "JetBrains Mono",monospace'; ctx.textAlign='left';
+  ctx.fillText(Math.round(hpPct*100)+'% HP', LX+4, HY+HH-4);
   ctx.font='7px "JetBrains Mono",monospace';
 
   // FREEDOM — Imagination meter

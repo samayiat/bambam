@@ -46,6 +46,23 @@ for key in (["hero.rot.south","hero.rot.east"]
 # hero.swing.*) aren't packed yet — comboKey() falls back to hero.punch.* until BamBam
 # has real combat frames to reframe the same way reframe_solo() does above.
 
+# a dedicated face-only crop for the HUD portrait / PWA icon (portrait()/buildManifest() in
+# game.html) — a plain body-sprite crop reads muddy at 28px, so this is packed separately
+# instead of zooming into hero.rot.south.
+def reframe_portrait(path, pad=6):
+    im=Image.open(path).convert("RGBA")
+    bb=im.getchannel("A").getbbox()
+    if bb: im=im.crop(bb)
+    avail=S-pad*2
+    f=min(avail/im.width, avail/im.height)
+    sm=im.resize((max(1,round(im.width*f)),max(1,round(im.height*f))),Image.LANCZOS)
+    cell=Image.new("RGBA",(S,S),(0,0,0,0))
+    cell.paste(sm,(round((S-sm.width)/2),round((S-sm.height)/2)),sm)
+    return cell
+
+PB=os.path.join(ROOT,"BamBamPortrait","face.png")
+PREFRAMED["hero.portrait"]=reframe_portrait(PB); add("hero.portrait", PB)
+
 # Street enemies (formerly vamp/Darnell/DarnellDark FATBACK art) and the crowd bystander
 # sprite (Smoking_a_cigarette) are no longer packed — drawVamp()/drawCrowd() draw a generic
 # procedural placeholder shape instead, until real BamBam enemy art (Security Guards, Corrupt
