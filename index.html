@@ -477,7 +477,7 @@ function buyContinue(){ const cost=continueCost(); if(P.bucks<cost) return;
 function callItNight(){ continueOn=false; $('continue').classList.remove('on'); showRecap('bust'); }
 $('contPay').onclick=buyContinue;
 $('contQuit').onclick=callItNight;
-function runScore(){ return Math.round(P.x/16) + night.bosses*300 + night.traffic*150 + night.cash + P.level*100; }
+function runScore(){ return Math.round(P.x/16) + night.bosses*300 + night.slams*150 + night.cash + P.level*100; }
 function showRecap(reason){
   dawnShown=true;
   const sc=runScore(), isBest=sc>bestScore;
@@ -485,7 +485,7 @@ function showRecap(reason){
   $('recapHead').textContent = reason==='dawn' ? "THE CITY IS FREE" : "THEY GOT YOU THIS TIME";
   $('recapStats').innerHTML =
     'DISTANCE <b>'+Math.round(P.x/16)+'m</b>  ·  BOSSES <b>'+night.bosses+'</b>  ·  LEVEL <b>'+P.level+'</b><br>'+
-    'TRAFFIC <b>'+night.traffic+'</b>  ·  BAMMY BUCKS <b>'+night.cash+'</b>  ·  DEATHS <b>'+P.deaths+'</b>  ·  CONTINUES <b>'+continues+'</b>';
+    'SLAMS <b>'+night.slams+'</b>  ·  BAMMY BUCKS <b>'+night.cash+'</b>  ·  DEATHS <b>'+P.deaths+'</b>  ·  CONTINUES <b>'+continues+'</b>';
   $('recapScore').innerHTML = 'SCORE <b>'+sc+'</b>'+(isBest?'  <span style="color:#c9d13a">NEW BEST!</span>':'  ·  BEST '+bestScore);
   $('recap').classList.add('on');
 }
@@ -607,7 +607,10 @@ function lerpHex(a,b,t){   // '#rrggbb' blend — used to drift the sky's hue as
   const br=parseInt(b.slice(1,3),16),bg=parseInt(b.slice(3,5),16),bb=parseInt(b.slice(5,7),16);
   return '#'+_hx(ar+(br-ar)*t)+_hx(ag+(bg-ag)*t)+_hx(ab+(bb-ab)*t);
 }
-const FLOOR_N=228, FLOOR_S=312, CURB=316, ROAD=320, ROAD_TARGET=340;   // ROAD_TARGET: where a shoved enemy sails out to, in the lanes
+// the whole strip is walkable — sidewalk AND road, no cars, no curb line. FLOOR_S/CURB/ROAD
+// still mark where the ground texture changes from sidewalk to asphalt; ROAD_TARGET is just
+// the deepest a grab-toss/knockdown can push someone.
+const FLOOR_N=228, FLOOR_S=312, CURB=316, ROAD=320, ROAD_TARGET=340;
 
 let debugFD='';
 
@@ -626,7 +629,7 @@ const SHOPHUE=['#d6de5a','#ffcf70','#4dffc0','#5aa8e8'];
 let BUILDINGS=[], CLUBS=[], GRATES=[], GATES=[];
 const MADE=new Set();
 let cans=[], ents=[], drops=[], parts=[], floats=[], fires=[];
-let cars=[], crowd=[], litter=[], steam=[], props=[];
+let crowd=[], litter=[], steam=[], props=[];
 // one hash seeded by world-x keeps the block identical every run
 function hsh(v){ const x=Math.sin(v*127.1+311.7)*43758.5453; return x-Math.floor(x); }
 const BPM=128, BEATLEN=60*60/BPM;                  // clubs share one pulse so the street has a tempo
@@ -708,7 +711,7 @@ let armedTip=false;                        // one-shot "hold punch to throw" tip
 let stageNum=1, wavesThisStage=0;           // which stage (1-3) and how many waves cleared in it so far
 const DAWN_X=1e15;                          // distance safety backstop only — stages end on the 3rd boss, not distance
 let lives=3, continues=0;                   // 3 lives, then pay to continue
-let night={bosses:0,cash:0,reach:0,traffic:0}; // recap tally + furthest reached THIS run (drives the stage-end clock)
+let night={bosses:0,cash:0,reach:0,slams:0}; // recap tally + furthest reached THIS run (drives the stage-end clock)
 let dawnShown=false, continueOn=false;   // freeze flags: recap / continue prompt
 const CONTINUE_COSTS=[50,100,250];          // then $500 every time after
 const continueCost=()=> CONTINUE_COSTS[continues]!==undefined?CONTINUE_COSTS[continues]:500;
@@ -719,14 +722,14 @@ function reset(){
   Object.assign(P,{x:120,z:300,y:0,vy:0,face:1,hp:8,maxhp:8,freedom:0,maxFreedom:100,xp:0,level:1,bucks:500,
     state:'idle',st:0,step:0,buf:0,connected:false,hitDone:false,iframes:0,
     dmgMul:1,dmgT:0,fireT:0,hitFlash:0,airT:0,deaths:0,
-    stepV:0,downT:0,knockV:0,weapon:null,grabE:null,grabbedBy:null,inStreet:false,downed:false});
+    stepV:0,downT:0,knockV:0,weapon:null,grabE:null,grabbedBy:null,downed:false});
   U={spirit:0,hands:0,body:0,chin:0,hustle:0,flow:0,insight:0,boots:0,reach:0,knuck:0,hide:0,second:0,pockets:0}; burgerCost=25;
 
   ents=[];drops=[];parts=[];floats=[];fires=[];camLock=null;camX=0;camFlash=0;
   boss=null; bossDone=0; bossDeaths=0; bossNagged=false; gauntlet=0; gauntletIx=0; stageNum=1; wavesThisStage=0;
   busMob=null; busMobAt = t + (Math.random()<0.75 ? Math.floor(rnd(1800,5400)) : Infinity);   // ~once a run, not guaranteed
-  lives=3; continues=0; night={bosses:0,cash:0,reach:0,traffic:0}; dawnShown=false;   // fresh stage run
-  cans=[]; crowd=[]; cars=[]; litter=[]; steam=[]; props=[];
+  lives=3; continues=0; night={bosses:0,cash:0,reach:0,slams:0}; dawnShown=false;   // fresh stage run
+  cans=[]; crowd=[]; litter=[]; steam=[]; props=[];
   BUILDINGS=[]; CLUBS=[]; GRATES=[]; GATES=[]; MADE.clear();
   _credited.clear();
   best=Math.max(best||0, 0);
@@ -1496,41 +1499,39 @@ function connect(e,s){
   return crit;
 }
 
-// ---- THE GRAB GAME AT THE CURB. it cuts both ways. ----
-//  YOU: hold ↓+punch to grab a mark; you both lock; a wind-up fills; then you HURL them into the street.
+// ---- THE GRAB GAME. it cuts both ways. ----
+//  YOU: hold ↓+punch near a mark to grab them; you both lock; a wind-up fills; then you HURL and SLAM them down.
 //       you're defenseless the whole time — take a hit and the grab breaks. release early to bail.
-//  THEM: near the curb an enemy can grab YOU. mash punch to break free, or they throw you into traffic.
+//  THEM: up close, an enemy can grab YOU. mash punch to break free, or they slam you to the ground.
 const GRAB_WIND=48;          // frames you hold before the toss launches (~0.8s — snappy, still a commitment)
-const EGRAB_LEN=82;          // frames an enemy holds you before hurling you into the street
+const EGRAB_LEN=82;          // frames an enemy holds you before slamming you down
 const EGRAB_ESCAPE=7;        // punch-mashes needed to break their grip
-function atCurb(){ return P.z >= FLOOR_S-8 && P.y===0 && P.state!=='down' && P.state!=='caged' && P.state!=='grabbed'; }   // right on the edge — as close to the street as you can stand
-function grabbable(){                                       // the single closest live enemy within arm's reach of the curb
+function grabbable(){                                       // the single closest live enemy within arm's reach
   let best=null,bd=1e9;
   for(const e of ents){ if(e.dead||e.k==='boss') continue;
-    if(e.state==='thrown'||e.state==='road'||e.state==='held'||e.state==='grabbing') continue;
+    if(e.state==='thrown'||e.state==='held'||e.state==='grabbing') continue;
     if(Math.abs(e.x-P.x)<38 && Math.abs(e.z-P.z)<24){ const dd=Math.hypot(e.x-P.x,(e.z-P.z)*1.6); if(dd<bd){ bd=dd; best=e; } } }   // true nearest, not just horizontal
   return best;
 }
 function tryGrab(){                                         // begin a grab (↓+punch, held). returns true if it started
-  if(P.state==='grab'||!atCurb()) return false;
+  if(P.state==='grab') return false;
   const e=grabbable(); if(!e) return false;
   P.face = e.x>=P.x?1:-1;
   P.state='grab'; P.grabE=e; P.grabT=0; P.step=0; P.buf=0;
   P.iframes=Math.max(P.iframes,9);                          // a couple i-frames as you commit to the grab
   e.state='held'; e.tok=false; e.hitstun=999; e.vx=0; e.vy=0;
-  blip(120,.05); rumble(160,.5,.5,true); say(e.x,e.z-30,'GRABBED','#ffb545');
+  blip(120,.05); rumble(160,.5,.5,true);
   return true;
 }
 function dropGrab(stun){                                    // let go without tossing
   const e=P.grabE; if(e){ e.state='stun'; e.hitstun=stun||18; e.y=0; }
   P.grabE=null; if(P.state==='grab') P.state='idle';
 }
-function launchGrabbed(){                                   // the wind-up completed — HURL them into the street
+function launchGrabbed(){                                   // the wind-up completed — HURL them, they slam down on landing
   const e=P.grabE; if(!e){ P.state='idle'; return; }
   e.state='thrown'; e.hitstun=0; e.tok=false; e.hitDone=true;
   e.vx=P.face*rnd(1.6,2.4); e.vy=4.8; e.y=Math.max(e.y,4);
   shake=Math.max(shake,6); blip(180,.07); rumble(260,.8,.6,true);
-  say(e.x,e.z-34,'INTO TRAFFIC','#ffb545');
   P.grabE=null; P.state='idle'; P.step=0; P.buf=0; P.iframes=Math.max(P.iframes,10);   // brief grace on the release/recovery
 }
 function throwWeapon(){                                     // hurl the held weapon as a projectile
@@ -1546,24 +1547,23 @@ function loseHeart(raw){
   P.hp=Math.max(0,P.hp-(full?1:0.5));
   return full;
 }
-// an enemy hurls YOU into the road: heavy, but survivable — i-frames keep a car from finishing you off
-function tossPlayerToStreet(fromX){
-  P.state='down'; P.inStreet=true; P.downT=70; P.iframes=100;
+// an enemy hurls YOU to the ground: heavy, but survivable
+function tossPlayerDown(fromX){
+  P.state='down'; P.downT=70; P.iframes=100;
   loseHeart(heavyHitAt()+14);
-  P.vy=4.0; P.y=Math.max(P.y,4); P.knockV=(P.x<fromX?-1:1)*2.2; P.z=Math.min(ROAD_TARGET,P.z+22);
+  P.vy=4.0; P.y=Math.max(P.y,4); P.knockV=(P.x<fromX?-1:1)*2.2;
   P.grabbedBy=null; P.struggle=0; P.grabImmune=150;
-  shake=12; hitstop=8; rumble(460,1,.8,true); say(P.x,P.z-40,'TOSSED','#ff2e88');
+  shake=12; hitstop=8; rumble(460,1,.8,true);
 }
-function splatInTraffic(e,c){                               // a car finds a body in the road
-  e.dead=1; e.splat=1; e.vx=Math.sign(c.spd||1)*Math.min(9,Math.abs(c.spd)); e.vy=0; e.y=0;
-  c.honked=true; blip(300,.06); shake=13; hitstop=Math.max(hitstop,11); rumble(520,1,1,true);
-  for(let i=0;i<22;i++) puff(e.x+rnd(-18,18), e.z-rnd(0,10), rnd(0,18), 1, i%3?'#8b1a2b':'#e8e2d4');
+function slamDown(e){                                       // a thrown enemy lands hard — the payoff of the grab-toss
+  e.dead=1; e.splat=1; e.vx*=0.4; e.vy=0; e.y=0;
+  blip(300,.06); shake=13; hitstop=Math.max(hitstop,11); rumble(520,1,1,true);
+  for(let i=0;i<22;i++) puff(e.x+rnd(-18,18), e.z-rnd(0,10), rnd(0,18), 1, i%3?'#ff8c3a':'#e8e2d4');
   const loot=e.big?4:e.elite?3:2;
-  for(let i=0;i<loot;i++) drop(e.x+rnd(-22,22), FLOOR_S-4, 'cash');   // payoff lands back on the sidewalk
-  tooth(e.x, FLOOR_S-4);
+  for(let i=0;i<loot;i++) drop(e.x+rnd(-22,22), e.z, 'cash');
+  tooth(e.x, e.z);
   gainFreedom(e.big?12:e.elite?9:6); gainXp(e.big?24:e.elite?18:12);
-  night.traffic=(night.traffic||0)+1;
-  say(e.x,e.z-28,'ROADKILL','#ff2e88');
+  night.slams=(night.slams||0)+1;
 }
 
 function hurtPlayer(dmg,fromX){
@@ -1606,17 +1606,6 @@ function blip(f,g){ if(!OPT.snd)return; try{ AC=AC||new (window.AudioContext||we
 
 //====================== ambient (runs on the title screen too) ======================
 function ambient(){
-  //---- traffic. headlights are the real point; the car is just what carries them.
-  if(t%110===0 && cars.length<3){
-    const dir=Math.random()<0.5?1:-1;
-    cars.push({x: dir>0?camX-180:camX+W+180, dir, spd:rnd(3.4,7.2)*dir,
-      col:['#e0344a','#2f6fe0','#f2c230','#3fbf6a','#e0783a','#c060e0'][Math.floor(Math.random()*6)],
-      lane: dir>0?348:334, len:rnd(78,104), horn:Math.random()<0.25});
-  }
-  for(const c of cars){ c.x+=c.spd;
-    if(c.horn && Math.abs(c.x-P.x)<40 && !c.honked){ c.honked=true; blip(300,.05); } }
-  cars=cars.filter(c=>c.x>camX-320 && c.x<camX+W+320);
-
   //---- steam off the grates
   if(t%7===0) for(const g of GRATES){ if(Math.abs(g.x-camX-W/2)>W*0.6) continue;
     steam.push({x:g.x+rnd(-8,8), z:g.z, y:0, vy:rnd(.28,.6), r:rnd(3,7), life:rnd(60,120), max:110}); }
@@ -1705,8 +1694,7 @@ function update(){
   else if(P.state==='down'){                   // on the pavement. nothing to do but get up.
     P.downT--; P.x+=P.knockV; P.knockV*=0.88;
     if(P.y>0||P.vy>0){ P.y+=P.vy; P.vy-=0.32; if(P.y<=0){P.y=0;P.vy=0;} }
-    if(P.inStreet && P.downT<24) P.z=Math.max(FLOOR_S, P.z-1.6);   // crawl back off the road as you get up
-    if(P.downT<=0){ P.state='idle'; P.iframes=Math.max(P.iframes,26); if(P.inStreet){ P.inStreet=false; P.z=FLOOR_S; } }
+    if(P.downT<=0){ P.state='idle'; P.iframes=Math.max(P.iframes,26); }
   }
   else if(P.state==='imagine'){                // Imagination attack — a toon-force burst that hits everyone close
     P.st++;
@@ -1792,7 +1780,7 @@ function update(){
     if(P.y<=0){ P.y=0;P.vy=0;
       if(P.state==='air'){shake=3; puff(P.x,P.z,6,7,'#6b6478'); rumble(220,.85,.4,true);} P.state='idle'; } }
 
-  P.z=clamp(P.z,FLOOR_N, P.inStreet?ROAD_TARGET+4:FLOOR_S);   // tossed into the road → allowed past the curb until you crawl back
+  P.z=clamp(P.z,FLOOR_N,ROAD_TARGET+4);   // the whole block is walkable — sidewalk AND road, no curb line
   P.x=clamp(P.x, camLock!==null?camLock+16:8, camLock!==null?camLock+W-24:Infinity);
 
   //---- the controller hums when the Freedom Meter is ready
@@ -1841,31 +1829,17 @@ function update(){
       if(P.grabE!==e || P.state!=='grab'){ e.state='stun'; e.hitstun=16; e.y=0; }
       continue;
     }
-    if(e.state==='grabbing'){                   // it's got YOU — hold, then hurl you into the street unless you mash out
+    if(e.state==='grabbing'){                   // it's got YOU — hold, then slam you down unless you mash out
       e.grabT=(e.grabT||0)+1; e.anim+=0.04;
       if(P.state==='grabbed' && P.grabbedBy===e){
         P.x=e.x+e.face*22; P.z=e.z; P.face=-e.face;
-        if(e.grabT>=EGRAB_LEN){ tossPlayerToStreet(e.x); e.state='stun'; e.hitstun=26; e.cd=rnd(70,130); }
+        if(e.grabT>=EGRAB_LEN){ tossPlayerDown(e.x); e.state='stun'; e.hitstun=26; e.cd=rnd(70,130); }
       } else { e.state='stun'; e.hitstun=20; e.cd=rnd(40,80); }   // you broke loose
       continue;
     }
-    if(e.state==='thrown'){                     // shoved off the curb — sailing out over the road
+    if(e.state==='thrown'){                     // hurled by the grab-toss — arcs through the air, slams down on landing
       e.x+=e.vx; e.vx*=0.99; e.y+=e.vy; e.vy-=0.3; e.anim+=0.2;
-      if(e.z<ROAD_TARGET) e.z=Math.min(ROAD_TARGET, e.z+2.6);
-      if(e.z>=CURB) for(const c of cars){ if(Math.abs(c.x-e.x)<c.len/2+14){ splatInTraffic(e,c); break; } }
-      if(e.dead) continue;
-      if(e.y<=0){ e.y=0; e.vy=0; e.vx*=0.3;
-        if(e.z>=CURB){ e.state='road'; e.roadT=0; }        // sprawled on the asphalt
-        else { e.state='stun'; e.hitstun=18; } }            // came up short, back on the curb
-      continue;
-    }
-    if(e.state==='road'){                        // down in the lane — a car can still finish the job
-      e.roadT++;
-      for(const c of cars){ if(Math.abs(c.x-e.x)<c.len/2+14){ splatInTraffic(e,c); break; } }
-      if(e.dead) continue;
-      if(e.roadT>80){ e.z-=1.5;                   // no car came — crawl back up onto the sidewalk, scraped up
-        if(e.z<=FLOOR_S){ e.z=FLOOR_S; e.state='stun'; e.hitstun=26; e.hp-=10; say(e.x,e.z-24,'ROAD RASH','#8b8496');
-          if(e.hp<=0&&!e.dead){ e.dead=1; gainFreedom(2); gainXp(4); } } }
+      if(e.y<=0){ e.y=0; slamDown(e); }
       continue;
     }
     if(e.state==='enter'){                     // walking out of the door into the street
@@ -1913,7 +1887,7 @@ function update(){
     else if(e.fire && d<want*0.62 && e.state!=='breathe'){       // you closed. it gives ground.
       e.x-=dx/d*e.spd*0.85; e.z-=clamp(dz,-1,1)*e.spd*0.4;
     }
-    e.z=clamp(e.z,FLOOR_N,FLOOR_S); e.anim+=e.spd*0.12;
+    e.z=clamp(e.z,FLOOR_N,ROAD_TARGET+4); e.anim+=e.spd*0.12;   // they'll follow you into the road too
     e.cd--;
     if(e.fire && d<(e.big?150:105) && d>(e.big?40:26) && e.cd<=0 && (e.tok||toks<2)){
       if(!e.tok){e.tok=true;toks++;} e.state='breathe'; e.st=0;
@@ -2035,7 +2009,7 @@ function respawn(){
   P.downed=false;                                  // respawn puts you on your feet — never leave the down flag set (continue path relies on this)
   P.step=0; P.buf=0; P.downT=0; P.iframes=110;
   P.cageB=null; P.struggle=0; if(boss) boss.caged=false;   // spring the briefcase if you died inside it
-  P.grabE=null; P.grabbedBy=null; P.inStreet=false;        // clear any grab in progress
+  P.grabE=null; P.grabbedBy=null;                          // clear any grab in progress
   P.weapon=null;                                           // you dropped whatever you were holding when you went down
   fires=[];
   for(const e of ents){ if(e.dead) continue;
@@ -2230,22 +2204,6 @@ function drawCrowd(cw){
   }
 }
 
-// traffic passes in FRONT. headlights rake the whole block on the way through.
-function drawCars(){
-  for(const c of cars){
-    const sx=c.x-camX, y=c.lane;
-    const hx=sx+c.dir*(c.len/2+6);
-    // body
-    ctx.fillStyle='#000'; ctx.globalAlpha=.4;
-    ctx.beginPath(); ctx.ellipse(sx,y+13,c.len/2,5,0,0,7); ctx.fill(); ctx.globalAlpha=1;
-    ctx.fillStyle=c.col; ctx.fillRect(sx-c.len/2,y-14,c.len,20);
-    ctx.fillRect(sx-c.len/2+14,y-24,c.len-30,11);              // cabin
-    ctx.fillStyle='rgba(140,200,240,.22)'; ctx.fillRect(sx-c.len/2+17,y-22,c.len-36,7);
-    ctx.fillStyle='#0a0810'; ctx.fillRect(sx-c.len/2+7,y+4,12,7); ctx.fillRect(sx+c.len/2-19,y+4,12,7);
-    ctx.fillStyle='#fff6d8'; ctx.fillRect(hx-c.dir*3,y-10,4,4);
-    ctx.fillStyle='#ff2a2a'; ctx.fillRect(sx-c.dir*(c.len/2)-2,y-10,4,3);
-  }
-}
 
 function drawLitter(){
   for(const l of litter){ ctx.globalAlpha=.5; ctx.fillStyle='#4a4458';
@@ -3017,14 +2975,13 @@ function render(){
   drawFires();
   drawStrikeWarning();
   drawLitter();
-  drawCars();
   drawBusMob();
 
-  // curb prompt: a staggered mark within reach of the street can be shoved into it
+  // grab prompt: a staggered mark within reach can be grabbed and slammed
   if(!boss && P.state!=='grab'){ const g=grabbable();
-    if(g && atCurb()){ const carSoon=cars.some(c=>Math.sign(c.spd)===Math.sign(g.x-c.x) && Math.abs(c.x-g.x)<180);
+    if(g){
       ctx.textAlign='center'; ctx.font='bold 9px "JetBrains Mono",monospace';
-      ctx.fillStyle= carSoon?'#ff2e88':'#ffb545'; if(t%20<15) ctx.fillText(carSoon?'HOLD ↓ GRAB →':'HOLD ↓ GRAB', g.x-camX, g.z-58);
+      ctx.fillStyle='#ffb545'; if(t%20<15) ctx.fillText('HOLD ↓ GRAB', g.x-camX, g.z-58);
       ctx.strokeStyle=ctx.fillStyle; ctx.lineWidth=1; ctx.globalAlpha=.5+.3*Math.sin(t*.3);
       ctx.strokeRect(g.x-camX-g.w, g.z-g.d, g.w*2, g.d*2); ctx.globalAlpha=1; } }
 
@@ -3036,7 +2993,7 @@ function render(){
       ctx.strokeStyle= active?'#ff2e88':'rgba(255,46,136,.25)'; ctx.lineWidth=active?2:1;
       ctx.strokeRect(b.x-camX-b.rw,b.z-b.rd,b.rw*2,b.rd*2); }
     ctx.strokeStyle='rgba(255,255,255,.1)'; ctx.lineWidth=1;
-    ctx.strokeRect(0,FLOOR_N,W,FLOOR_S-FLOOR_N); }
+    ctx.strokeRect(0,FLOOR_N,W,ROAD_TARGET+4-FLOOR_N); }
 
   ctx.textAlign='center'; ctx.font='bold 10px "JetBrains Mono",monospace';
   for(const f of floats){ ctx.globalAlpha=clamp(f.life/25,0,1);
