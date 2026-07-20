@@ -1,7 +1,7 @@
 {
-  "name": "FATBACK",
-  "short_name": "FATBACK",
-  "description": "The drunker you get, the harder you hit. And the less you land.",
+  "name": "BamBam: Warrior of Liberation",
+  "short_name": "BamBam",
+  "description": "A 2D beat 'em up. Fight to restore imagination, creativity, and freedom to a city losing its soul.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",

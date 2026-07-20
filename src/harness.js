@@ -79,24 +79,24 @@ Math.random=()=>{ __rng|=0; __rng=(__rng+0x6D2B79F5)|0; let x=Math.imul(__rng^(_
 global.setTimeout=(f)=>{ try{f();}catch(e){} return 0; };  // waves spawn inline so we can test them
 const driver = `
 ;globalThis.__G=()=>({
-   get P(){return P}, get ents(){return ents}, get crowd(){return crowd}, get npcs(){return npcs},
+   get P(){return P}, get ents(){return ents}, get crowd(){return crowd},
    get drops(){return drops}, get fires(){return fires}, get cans(){return cans}, get cars(){return cars},
    get BUILDINGS(){return BUILDINGS}, get GATES(){return GATES}, get U(){return U},
    get UPG(){return UPG}, get COMBO(){return COMBO}, get camX(){return camX},
    get boss(){return boss}, get camLock(){return camLock},
-   get date(){return date}, get dateOn(){return dateOn},
    get lives(){return lives}, get night(){return night}, get dawnShown(){return dawnShown},
-   get continueOn(){return continueOn}, get builtOn(){return builtOn}, get DAWN_X(){return DAWN_X},
+   get continueOn(){return continueOn}, get DAWN_X(){return DAWN_X},
    get busMob(){return busMob},
    spawn:(e)=>ents.push(e), clearEnts:()=>{ ents.length=0; },
    setCamLock:(v)=>{ camLock=v; camX=v; }, setBest:(v)=>{ best=v; }, setLives:(v)=>{ lives=v; },
    setBusMobAt:(v)=>{ busMobAt=v; },   // deterministic suite: park the once-a-run roll so it can't fire mid-scene
-   releaseArena:()=>{ ents.length=0; camLock=null; boss=null; bossDone=0; hitstop=0; dateOn=false; date=null; fires.length=0; },
-   rat,vamp,connect,hurtPlayer,setShop,buy,spawnWave,tier,stream,update,render,talkLen,resolveTalk,aggro,mkNpc,coopApply,coopBroadcastEnts,coopMirrorEnts,
+   releaseArena:()=>{ ents.length=0; camLock=null; boss=null; bossDone=0; hitstop=0; fires.length=0; },
+   rat,vamp,connect,hurtPlayer,setShop,buy,spawnWave,tier,stream,update,render,aggro,coopApply,coopBroadcastEnts,coopMirrorEnts,
    tryGrab,grabbable,atCurb,splatInTraffic,dropGrab,launchGrabbed,tossPlayerToStreet,
    throwWeapon,drop, get WEAPONS(){return WEAPONS},
-   genBoss,spawnBoss,updateBoss,killBoss,enrageBoss,hits,atkBox,startDate,resolveDate,
-   buyContinue,callItNight,clutchRevive,continueCost,confFloor,
+   genBoss,spawnBoss,updateBoss,killBoss,enrageBoss,hits,atkBox,
+   buyContinue,callItNight,continueCost,
+   gainFreedom,gainXp,loseHeart,heavyHitAt,maxComboStep,xpToLevel,
    spawnBusMob,updateBusMob});
 ;globalThis.__key=(k,v)=>{ if(v&&!key[k]) pressed[k]=true; key[k]=v; };
 ;globalThis.__tick=(n)=>{ for(let i=0;i<n;i++){ update(); } };

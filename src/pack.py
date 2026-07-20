@@ -105,29 +105,6 @@ K="Smoking_a_cigarette."
 for d in ["south","south-east","east","north-east","north","north-west","west","south-west"]:
     add(f"smoke.rot.{d}", f"{K}/rotations/{d}.png")
 
-# the women outside the clubs. NPCs only ever render 4 of the 8 directions
-# (drawNPC uses south, south-east, south-west when you're close, and north once
-# she's done with you) — so we pack only those, not the full rotation. Halves
-# the atlas cost per woman and matches the "flip east/west, skip the rest" idea.
-WOMEN=["Keisha","Marisol","Simone","Tiana","Nova","Mei","Camila","Priya",
-       "Glamorous","Radiant","ElegantSamoa","VibrantLatina","SleekPro"]
-NPC_DIRS=["south","south-east","south-west","north"]
-for wi,Wn in enumerate(WOMEN):
-    for d in NPC_DIRS:
-        p=f"{Wn}/rotations/{d}.png"
-        if os.path.exists(os.path.join(ROOT,p)):
-            add(f"w{wi}.rot.{d}", p)
-
-# mood loops (south-facing, 6 frames) for the women who have them. the crew
-# system plays talk/laugh; women without a matching loop fall back to their idle
-# rotation. keys: w{i}.talk.*, w{i}.laugh.*
-for wi,Wn in enumerate(WOMEN):
-    for anim,folder in [("talk","talking"),("laugh","laughing")]:
-        for fi in range(6):
-            p=f"{Wn}/animations/{folder}/south/frame_{fi:03d}.png"
-            if os.path.exists(os.path.join(ROOT,p)):
-                add(f"w{wi}.{anim}.{fi}", p)
-
 # environment props (92x92)
 PROPS=["dumpster","hydrant","mailbox","sign"]
 for prop in PROPS:
@@ -135,33 +112,6 @@ for prop in PROPS:
         add(f"prop.{prop}", f"props/{prop}.png")
 
 FOOT=70   # matches game.html: feet sit on this row of the 92px cell
-
-FIG_H=44   # target figure height in px — just under the men's ~46, regardless of source export size
-
-def reframe(im):
-    """The women come from PixelLab at varying export sizes (136 / 180 / 184px)
-    with the figure filling most of the frame — dropped straight in they tower
-    over the 5'11 hero and their feet land below the FOOT baseline. Crop to the
-    actual figure, scale it to a FIXED target height (so every woman is the same
-    scale no matter her export size), and seat the feet on row FOOT so spr()
-    places them like every other sprite.
-
-    Resize uses NEAREST, not LANCZOS: LANCZOS is built for smooth photographic
-    downscaling and blurs flat-color pixel art, and it blurs MORE at steeper
-    ratios — so a 184px source (bigger downscale) came out softer than a 136px
-    one, on top of the game's canvas already being rendered pixelated everywhere
-    else. NEAREST keeps hard edges and reads consistent across every source size."""
-    a=im.getchannel("A"); bb=a.getbbox()
-    if not bb: return im.resize((S,S), Image.NEAREST)
-    fig=im.crop(bb)
-    f=FIG_H/fig.height                       # normalize to target height, not a fixed factor
-    nw,nh=max(1,round(fig.width*f)),max(1,round(fig.height*f))
-    fig=fig.resize((nw,nh), Image.NEAREST)
-    cell=Image.new("RGBA",(S,S),(0,0,0,0))
-    cell.paste(fig, ((S-nw)//2, FOOT-nh), fig)   # centered, feet on the baseline
-    return cell
-
-def is_woman(key): return len(key)>1 and key[0]=="w" and key[1].isdigit()
 
 n=len(entries)
 rows=(n+COLS-1)//COLS
@@ -171,8 +121,7 @@ for i,(key,path) in enumerate(entries):
     if key in PREFRAMED: im=PREFRAMED[key]           # hero combat anims, already reframed to 92px
     else:
         im=Image.open(path).convert("RGBA")
-        if is_woman(key): im=reframe(im)
-        elif im.size!=(S,S): im=im.resize((S,S), Image.NEAREST)
+        if im.size!=(S,S): im=im.resize((S,S), Image.NEAREST)
     cx,cy=(i%COLS)*S,(i//COLS)*S
     sheet.paste(im,(cx,cy))
     index[key]=[cx,cy]

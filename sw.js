@@ -1,4 +1,4 @@
-// FATBACK service worker.
+// BamBam service worker.
 // Two jobs: make the game playable with no signal, and satisfy Chrome's
 // installability check (which requires a fetch handler on a real origin).
 //
@@ -6,8 +6,8 @@
 // next time you're online — the old cache-first worker pinned players to the
 // first build they ever loaded. Static shell assets stay cache-first. Bump
 // VERSION on every shipped change so activate() clears the previous cache.
-const VERSION = 'v43';
-const CACHE = 'fatback-' + VERSION;
+const VERSION = 'v1';
+const CACHE = 'bambam-' + VERSION;
 const SHELL = [
   './',
   './index.html',

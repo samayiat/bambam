@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FATBACK build.
+BamBam build.
 
     python3 src/build.py
 
