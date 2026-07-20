@@ -1088,7 +1088,8 @@ function coopDownedUpdate(){                      // you're on the pavement, fro
   camX+=((P.x-W*0.42)-camX)*0.09; camX=Math.max(0,camX);
 }
 function puff(x,z,y,n,col){ for(let i=0;i<n;i++) parts.push({x,z,y,vx:rnd(-2,2),vy:rnd(-.4,2.6),vz:rnd(-.7,.7),life:rnd(14,30),col}); }
-function say(x,z,txt,col){ floats.push({x,z,y:78,txt,col:col||'#fff',life:60}); }
+// floating combat/status subtext is off for now — POW (finger guns) is the one exception
+function say(x,z,txt,col){ if(txt!=='POW') return; floats.push({x,z,y:78,txt,col:col||'#fff',life:60}); }
 
 function spawnWave(T){
   if(coopGuest()) return;    // host spawns waves; the guest mirrors them
