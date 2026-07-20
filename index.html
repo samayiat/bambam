@@ -843,7 +843,7 @@ function vamp(x,z,fromDoor,forceElite,skin){
   enterZ:z+rnd(26,60)}; }
 function darnell(x,z,fromDoor,forceElite){ return vamp(x,z,fromDoor,forceElite,'darnell'); }
 
-// sandwich monster — the deli's henchmen. small, hungry, driven by the generic enemy AI.
+// boss backup — security guards, nurses, soldiers. small, driven by the generic enemy AI.
 function sammich(x,z){ return {k:'sammich',x,z,y:0,vy:0,vx:0,
   hp:34,maxhp:34, w:15,d:11,h:26, spd:0.8, dmg:8,
   flash:0,face:-1,state:'walk',st:0,anim:0,tok:false,hitstun:0,dead:0,cd:rnd(24,70)}; }
@@ -1191,35 +1191,22 @@ function drawBusMob(){
 //====================== bosses ======================
 // every 250m the street clears and a giant procedural monster rises. three archetypes,
 // each rolled fresh from the boss number so no two encounters are the same.
-const BOSS_ARCH=['ratking','bouncer','crawler','deli','subway','halal','auteur','tourist','lawyer'];
-const BOSS_NAME={ratking:'THE RAT KING',bouncer:'THE BOUNCER',crawler:'THE CRAWLER',deli:'THE DELI MAN',
-  subway:'THE TRACK WORKER',halal:'THE CART MAN',auteur:'THE AUTEUR',tourist:'THE TOURIST',lawyer:'THE LAWYER'};
+const BOSS_ARCH=['landlord','farma','president'];
+const BOSS_NAME={landlord:'LANDLORD D. EVICT', farma:'B.I.G. FARMA', president:'THE PRESIDENT'};
 const BOSS_PAL={
-  ratking:{body:'#4a3a2c',dark:'#2b2016',glow:'#ff5a2e'},
-  bouncer:{body:'#3a3d4a',dark:'#22242e',glow:'#ff2e88'},
-  crawler:{body:'#2f4a30',dark:'#182a18',glow:'#c9ff3a'},
-  deli:{body:'#d8d2c0',dark:'#9a3d3f',glow:'#ffb03a'},   // white apron, meat-red, pastrami-gold weak point
-  subway:{body:'#c96a1e',dark:'#3a3f47',glow:'#ffd23a'}, // safety-orange vest, MTA grey, headlight yellow
-  halal:{body:'#c4302b',dark:'#2a2622',glow:'#ff8c1a'},  // red cart, char-grey, flame-orange weak point
-  auteur:{body:'#1c1c20',dark:'#0e0e12',glow:'#e23b3b'}, // all black — turtleneck & beret — viewfinder-red eye
-  tourist:{body:'#f0ece0',dark:'#3f8f5a',glow:'#fdf4c8'},// white tee, cargo-shorts green, camera-flash white
-  lawyer:{body:'#2a2c34',dark:'#15161c',glow:'#e0483a'}, // charcoal suit, near-black, power-red tie/objection-red
+  landlord:{body:'#3a2f1a',dark:'#1a140a',glow:'#c9d13a'},  // cheap gray-brown suit, eviction-notice yellow glow
+  farma:{body:'#e8e2d4',dark:'#2f7a3f',glow:'#2fffa8'},     // lab coat, pharma-green trim, toxic-glow weak point
+  president:{body:'#1a2a4a',dark:'#0e1830',glow:'#ff2e88'}, // navy suit, near-black, power-red glow
 };
-// 'repel' is NOT in the random rotation — it only fires as the mash-punish (see connect()), so no
-// regular move ever tanks your drunk straight to zero. Regular hits sober you a little; heavy hits a lot.
-const BOSS_MOVES={ratking:['fire','sweep','charge'],bouncer:['stomp','hook','charge'],crawler:['charge','stab','sweep'],deli:['boot'],subway:['kick'],halal:['skewer'],auteur:['clap','tornado'],tourist:['photo'],lawyer:['subpoena','gavel','lockup']};
 const bossInv=b=>{                                 // i-frames: can't be traded through
   if(b.state==='intro') return true;
-  if(b.arch==='deli'){
-    if(b.phase==='guard') return true;             // his henchmen shield him — clear them first
-    if(b.phase==='gun') return b.state!=='reload'; // strapped: only open while he's reloading
-    return b.state==='wind'||b.state==='attack'||b.state==='draw';   // boot phase: mid-swing only
+  if(b.arch==='landlord'){
+    if(b.phase==='guard') return true;             // his guards shield him — clear them first
+    if(b.phase==='dizzy') return false;            // exhausted — wide open, no exceptions
+    return b.state==='wind'||b.state==='attack';   // notices phase: mid-throw only
   }
-  if(b.arch==='subway') return b.state==='retreat'||b.state==='train'||b.state==='climb'||b.state==='wind'||b.state==='attack';   // untouchable while he's down on the tracks
-  if(b.arch==='halal')  return b.state==='duck'||b.state==='wind'||b.state==='attack';   // ducked behind the cart = shielded
-  if(b.arch==='auteur') return b.state==='wind'||b.state==='attack';   // NB 'tidy' is deliberately vulnerable — that's the opening
-  if(b.arch==='tourist') return b.state==='wind'||b.state==='attack';  // camera up = untouchable; open on the recover
-  if(b.arch==='lawyer')  return b.state==='wind'||b.state==='attack';   // guarded mid-serve/mid-slam; open on the recover
+  if(b.arch==='farma') return b.state==='wind'||b.state==='attack';   // NB 'crash' (power-up wearing off) is deliberately vulnerable
+  if(b.arch==='president') return b.state==='retreat'||b.state==='incoming'||b.state==='strike'||b.state==='wind'||b.state==='attack';   // untouchable mid missile-strike or mid move
   return b.state==='wind'||b.state==='attack';
 };
 function bossRepel(b){                              // "get away from me" — huge knockback
@@ -1233,54 +1220,47 @@ function bossRepel(b){                              // "get away from me" — hu
   b.repelCd=300;   // 5s minimum between repels — no more spamming you into oblivion
 }
 
-// crawler (the spider) always opens the night. subway/deli/halal are rarer pulls after
-// that — real weighted-random per boss instead of a fixed rotation, so who shows up
-// (beyond the guaranteed opener) actually varies run to run.
-const BOSS_WEIGHT={ratking:1,bouncer:1,crawler:1,deli:0.3,subway:0.3,halal:0.3,auteur:1,tourist:1,lawyer:1};
-function pickBossArch(bn,H){
-  if(bn===1) return 'crawler';
-  let r=H(1)*Object.values(BOSS_WEIGHT).reduce((s,w)=>s+w,0);
-  for(const a of BOSS_ARCH){ const w=BOSS_WEIGHT[a]; if(r<w) return a; r-=w; }
-  return BOSS_ARCH[BOSS_ARCH.length-1];
-}
+// three named bosses, one per level — deterministic, matching the story order.
+function pickBossArch(bn){ return BOSS_ARCH[(bn-1)%BOSS_ARCH.length]; }
 function genBoss(bn,forceArch){
   const sd=bn*97.31+3.7, H=k=>hsh(sd+k*1.7);
-  const arch=forceArch||pickBossArch(bn,H);   // spider first, then weighted-random (train/deli/cart rare)
-  const mul={ratking:1,bouncer:1.15,crawler:0.85,deli:1.2,subway:1.1,halal:0.95,auteur:1.0,tourist:1.05,lawyer:1.1}[arch];
-  const b={ k:'boss', big:true, arch, name:BOSS_NAME[arch], pal:BOSS_PAL[arch], moves:BOSS_MOVES[arch],
+  const arch=forceArch||pickBossArch(bn);
+  const mul={landlord:1.2,farma:1.0,president:1.1}[arch];
+  const b={ k:'boss', big:true, arch, name:BOSS_NAME[arch], pal:BOSS_PAL[arch],
     x:0,z:0,y:0,vy:0,vx:0,face:-1, state:'intro',st:0,anim:0,hitstun:0,dead:0,flash:0,tok:false,
     weakOpen:0,dmgTaken:0,rise:1,cd:50,move:null,windLen:24,atkLen:28,hitDone:false,repelCd:0,enraged:false,enrageRoll:false,enrageT:0,
-    hp:0,maxhp:0, sc: arch==='crawler'?2.6:(arch==='deli'?3.0:(arch==='subway'||arch==='halal'?2.9:(arch==='auteur'||arch==='tourist'||arch==='lawyer'?2.9:3.1))),
-    segs: arch==='ratking'?4+Math.floor(H(3)*4):3,
-    legs: arch==='crawler'?6+Math.floor(H(4)*5):(arch==='ratking'?4:2),
-    spd: arch==='crawler'?1.5:(arch==='bouncer'?0.7:(arch==='deli'?0.85:(arch==='halal'?0.8:(arch==='subway'?1.1:(arch==='auteur'?1.0:(arch==='lawyer'?0.95:1.05)))))),
+    hp:0,maxhp:0, sc:3.0,
+    spd: arch==='landlord'?0.85:(arch==='farma'?1.0:0.95),
     dmg:10,
-    phase:null, shots:0, reloadT:0,             // deli-only phase state (ignored by other archetypes)
-    trainCd:260, trainX:0, duckCd:210,           // subway train timer / halal duck timer
-    tidyCd:220, buffT:0,                          // auteur compulsion timer / attack-speed buff
-    photo:null, busX:0, busPark:0 };              // tourist photo frame + tour-bus position
+    phase:null, shots:0,                          // landlord-only phase state (ignored by other archetypes)
+    strikeCd:260, strikeX:0, summonCd:340,          // president missile-strike + patrol summon timers
+    buffCd:220, buffT:0, finalPhase:false };        // farma's self-inject timer / president's one-punch flag
   b.maxhp=b.hp=Math.round((220+bn*90)*mul*2.0);   // tanky, but not a slog — you earn it in the (now longer) openings
-  b.w= arch==='crawler'?46:(arch==='deli'?34:(arch==='halal'?40:32)); b.d=18;
-  b.h= arch==='bouncer'?98:(arch==='deli'?92:(arch==='subway'?86:(arch==='halal'?82:(arch==='auteur'?86:(arch==='tourist'?84:(arch==='lawyer'?88:76))))));
+  b.w= arch==='landlord'?34:32; b.d=18;
+  b.h= arch==='landlord'?92:(arch==='farma'?86:88);
   return b;
 }
 
 function spawnBoss(bn,forceArch){
-  if(MP) return;             // no bosses in co-op — covers gates, the 250m timer, the date "her man", and the dev gauntlet
+  if(MP) return;             // no bosses in co-op — covers gates, the level timer, and the dev gauntlet
   const b=genBoss(bn,forceArch);
   b.x=clamp(camLock+W*0.72, camLock+60, camLock+W-60); b.z=FLOOR_N+34; b.face=-1;
   for(const e of ents) if(!e.dead){ e.dead=1; e.vx=(e.x<b.x?-1:1)*3; }   // the street clears — scatter any stragglers
   for(const cw of crowd) cw.joinT=0;                          // and nobody new joins in
   boss=b; ents.push(b); bossDeaths=0; bossNagged=false;   // fresh encounter, fresh death count
-  if(b.arch==='tourist'){ b.busPark=camLock+W*0.5; b.busX=camLock+W+300;   // the tour bus rolls in and parks across the street
-    say(b.x,b.z-72,'GET A PHOTO?',b.pal.glow); }
   for(const g of GATES) if(g.x<P.x && !g.done) g.done=true;   // no gate wave stacks onto/after the boss
-  if(b.arch==='deli'){                       // he sends the sandwiches out first — beat them to reach him
+  if(b.arch==='landlord'){                   // he sends security out first — beat them to reach him
     b.phase='guard';
     const nH=3;
     for(let i=0;i<nH;i++){ const hx=clamp(b.x+b.face*(48+i*30), camLock+40, camLock+W-40);   // out front, between you and him
       ents.push(sammich(hx, FLOOR_N+18+i*22)); }
-    say(b.x,b.z-72,'ORDER UP!',b.pal.glow);
+    say(b.x,b.z-72,'SECURITY!',b.pal.glow);
+  }
+  if(b.arch==='farma'){
+    const nH=2;
+    for(let i=0;i<nH;i++){ const hx=clamp(b.x+b.face*(48+i*34), camLock+40, camLock+W-40);
+      ents.push(sammich(hx, FLOOR_N+18+i*22)); }
+    say(b.x,b.z-72,'NURSE!',b.pal.glow);
   }
   shake=12; rumble(760,1,.7,true); blip(60,.1);
   say(P.x,P.z-54,'BOSS','#ff2e88'); say(b.x,b.z-84,b.name,b.pal.glow);
@@ -1322,352 +1302,142 @@ function killBoss(b){
   for(let i=0;i<24;i++) puff(b.x+rnd(-60,60),b.z,rnd(0,50),1,b.pal.glow);
 }
 
-function bossHit(reach,zr,dmg,sober){                      // shared melee check for boss attacks
-  if(boss.hitDone) return;
-  // Tight forward strike zone: you have to be lined up in front to eat it, not just nearby.
-  const cx=boss.x+boss.face*reach*0.85;                    // centered out in front of the boss
-  if(Math.abs(P.x-cx)<reach*0.5 && Math.abs(P.z-boss.z)<zr*0.6){
-    hurtPlayer(dmg,boss.x,sober); boss.hitDone=true; }
-}
-// SOBER tiers: light pokes rattle you a little (10%), heavy signature hits crack you sober (50%).
+// SOBER tiers: legacy parameter name, now vestigial since hurtPlayer() ignores its 3rd arg.
 const S_LIGHT=10, S_HEAVY=50;
-function bossAttack(b,dx,dz,d){
-  const m=b.move, ch=heavyHitAt();
-  if(m==='fire'){ if(b.st>6 && b.st<34 && b.st%2===0) emitFire(b); }
-  else if(m==='stomp'){
-    if(b.st===12){ shake=11; rumble(320,1,.5,true);        // slam → ground shockwave (heavy)
-      if(P.y<26 && Math.abs(P.x-b.x)<92){ hurtPlayer(ch+8,b.x,S_HEAVY); }
-      for(let i=0;i<16;i++) puff(b.x+rnd(-46,46),b.z,rnd(0,6),1,'#6b6478'); } }
-  else if(m==='charge'){ if(b.st<30){ b.x+=b.face*b.spd*3.0; bossHit(42,18,ch+4,S_HEAVY); } }
-  else if(m==='hook'){ if(b.st>8 && b.st<18) bossHit(54,18,ch+6,S_HEAVY); }
-  else if(m==='stab'){ if(b.st>8 && b.st<16) bossHit(30,22,ch+4,S_LIGHT); }
-  else if(m==='sweep'){ if(b.st>6 && b.st<20) bossHit(60,20,ch+2,S_LIGHT); }
-  else if(m==='repel'){ if(b.st===8){ shake=9; rumble(320,.9,.6,true);   // "get away from me" burst
-    for(let i=0;i<14;i++) puff(b.x+rnd(-40,40),b.z,rnd(0,32),1,b.pal.glow);
-    if(Math.abs(P.x-b.x)<92 && P.y<32 && b.repelCd<=0) bossRepel(b); } }
-}
-
-function enrageBoss(b){                            // the second wind fires — heal to 50% (once), swell, red, faster
-  b.enraged=true; b.enrageRoll=true; b.hp=Math.round(b.maxhp*0.5); b.enrageT=1;
-  shake=15; hitstop=9; rumble(640,1,1,true);
-  for(let i=0;i<20;i++) puff(b.x+rnd(-30,30), b.z, rnd(0,b.h), 1, '#ff2a2a');
-  say(b.x,b.z-92,'NOT GOING LIKE THAT','#ff2a2a'); blip(110,.16);
-}
 function updateBoss(b){
   b.anim+=0.05; if(b.flash>0)b.flash--; if(b.weakOpen>0)b.weakOpen--; if(b.repelCd>0)b.repelCd--;
-  if(b.arch==='tourist') b.busX += (b.busPark-b.busX)*0.12;   // the bus keeps rolling in during the intro
   const dx=P.x-b.x, dz=P.z-b.z, d=Math.abs(dx);
   if(b.state!=='intro') b.face=dx>0?1:-1;
-
-  // ENRAGE — the FIRST time a boss drops below 25% HP it gets ONE 20% chance at a SECOND WIND:
-  // heal back to 50%, swell, glow red, come at you faster. 80% of the time it just keeps dying.
-  if(!b.enraged && !b.enrageRoll && b.arch!=='deli' && b.hp>0 && b.hp < b.maxhp*0.25 && b.state!=='intro' && b.state!=='dead'){
-    b.enrageRoll=true;                            // roll only once per fight, win or lose
-    if(Math.random()<0.20) enrageBoss(b);
-  }
-  if(b.enraged && b.state!=='dead'){ b.enrageT=(b.enrageT||0)+1;
-    b.cd -= 0.8;                                 // presses attacks harder — comes at you faster
-    if(b.state==='recover') b.st += 0.7;         // …and shakes off the recovery quicker
-  }
 
   if(b.state==='intro'){ b.st++; b.rise=Math.max(0,1-b.st/40);
     if(b.st===1){ shake=10; } if(b.st>=46){ b.state='idle'; b.cd=36; } return; }
   if(b.state==='dead'){ b.st++; return; }
-  if(b.arch==='deli'){ updateDeli(b,dx,dz,d); return; }   // the deli man runs his own three-phase fight
-  if(b.arch==='subway'){ updateSubway(b,dx,dz,d); return; }
-  if(b.arch==='halal'){ updateHalal(b,dx,dz,d); return; }
-  if(b.arch==='auteur'){ updateAuteur(b,dx,dz,d); return; }
-  if(b.arch==='tourist'){ updateTourist(b,dx,dz,d); return; }
-  if(b.arch==='lawyer'){ updateLawyer(b,dx,dz,d); return; }
-  if(b.state==='stagger'){ b.st++; b.weakOpen=6; if(b.st>=90){ b.state='idle'; b.cd=30; } return; }
-  if(b.state==='recover'){ b.st++; b.weakOpen=6; if(b.st>=52){ b.state='idle'; b.cd=rnd(40,75); } return; }   // longer recovery = attacks less often AND a bigger window to punish
-  if(b.state==='wind'){ b.st++; if(b.st===1) blip(60,.06);
-    if(b.st>=b.windLen){ b.state='attack'; b.st=0; b.hitDone=false; } return; }
-  if(b.state==='attack'){ b.st++; bossAttack(b,dx,dz,d);
-    if(b.st>=b.atkLen){ b.state='recover'; b.st=0; }
-    b.x=clamp(b.x,camLock+30,camLock+W-30); return; }
-
-  // idle / approach
-  b.st++;
-  if(d>92) b.x+=b.face*b.spd;
-  b.z+=clamp(dz,-1,1)*b.spd*0.4; b.z=clamp(b.z,FLOOR_N,FLOOR_S);
-  b.x=clamp(b.x,camLock+30,camLock+W-30);
-  b.cd--;
-  if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='stagger'; b.st=0;
-    shake=6; rumble(220,.6,.5,true); say(b.x,b.z-64,'STAGGERED',b.pal.glow); return; }
-  if(b.cd<=0){
-    const m=b.moves[Math.floor(Math.random()*b.moves.length)];
-    b.move=m; b.state='wind'; b.st=0;
-    b.windLen= m==='fire'?34:(m==='stomp'?26:(m==='charge'?20:(m==='repel'?16:24)));
-    b.atkLen = m==='fire'?40:(m==='charge'?46:(m==='stomp'?26:(m==='repel'?22:26)));
-  }
+  if(b.arch==='landlord'){ updateLandlord(b,dx,dz,d); return; }   // guards -> notices -> exhausted and dizzy
+  if(b.arch==='farma'){ updateFarma(b,dx,dz,d); return; }         // pills/syringes -> self-inject buff -> crashes
+  if(b.arch==='president'){ updatePresident(b,dx,dz,d); return; } // runs, calls in strikes and backup, then one punch ends it
 }
 
-// ---- THE DELI MAN: guard (henchmen) → boot melee → strapped (Galaga gun) ----
-function updateDeli(b,dx,dz,d){
-  const ch=heavyHitAt();
+// ---- LANDLORD D. EVICT: guard (security) → notices (eviction paper volley) → exhausted (dizzy, wide open) ----
+function updateLandlord(b,dx,dz,d){
   const hench=ents.filter(e=>e.k==='sammich'&&!e.dead).length;
   // phase transitions
-  if(b.phase==='guard' && hench===0){ b.phase='boot'; b.state='idle'; b.cd=30; b.move='boot';
-    say(b.x,b.z-90,'NOW YOU. TIMBS.',b.pal.glow); shake=9; rumble(420,1,.7,true); }
-  if(b.phase==='boot' && b.hp<=b.maxhp*0.25){ b.phase='gun'; b.state='draw'; b.st=0; b.shots=0;
-    say(b.x,b.z-90,'STRAPPED!','#ff2e88'); shake=13; rumble(620,1,.9,true); }
+  if(b.phase==='guard' && hench===0){ b.phase='notices'; b.state='idle'; b.cd=30; b.move='notice';
+    say(b.x,b.z-90,"FINE. I'LL DO IT MYSELF.",b.pal.glow); shake=9; rumble(420,1,.7,true); }
+  if(b.phase==='notices' && b.hp<=b.maxhp*0.25){ b.phase='dizzy'; b.state='dizzy'; b.st=0;
+    say(b.x,b.z-90,'OUT OF BREATH...','#ff2e88'); shake=10; rumble(500,1,.7,true); }
 
   if(b.phase==='guard'){
     b.weakOpen=0; b.move='guard';
-    if(d>150) b.x+=b.face*b.spd*0.5;                 // shuffles to stay behind the sandwiches
+    if(d>150) b.x+=b.face*b.spd*0.5;                 // shuffles to stay behind his security
     b.x=clamp(b.x,camLock+40,camLock+W-30);
-    if(t%110===0) say(b.x,b.z-70,['GET THRU THEM','THEY HUNGRY','FRESH CUT'][Math.floor(Math.random()*3)],b.pal.glow);
+    if(t%110===0) say(b.x,b.z-70,['THIS IS PRIVATE PROPERTY','PAY UP OR GET OUT','CALL SECURITY'][Math.floor(Math.random()*3)],b.pal.glow);
     return;
   }
-  if(b.phase==='boot'){
-    if(b.state==='recover'){ b.st++; b.weakOpen=6; if(b.st>=46){ b.state='idle'; b.cd=rnd(40,70); } return; }
-    if(b.state==='wind'){ b.st++; if(b.st===1) blip(60,.06); if(b.st>=24){ b.state='attack'; b.st=0; b.hitDone=false; } return; }
-    if(b.state==='attack'){ b.st++;
-      if(b.st===12 && !b.hitDone){ shake=8; rumble(320,1,.6,true);   // the boot comes down — heavy, sobering
-        if(Math.abs(P.x-(b.x+b.face*46))<52 && Math.abs(P.z-b.z)<26 && P.y<40){ hurtPlayer(ch+8,b.x,S_HEAVY); }
-        for(let i=0;i<10;i++) puff(b.x+b.face*46,b.z,rnd(0,10),1,'#6b6478'); b.hitDone=true; }
-      if(b.st>=30){ b.state='recover'; b.st=0; }
-      b.x=clamp(b.x,camLock+30,camLock+W-30); return; }
-    // idle / approach
-    b.st++;
-    if(d>52) b.x+=b.face*b.spd;
-    b.z+=clamp(dz,-1,1)*b.spd*0.4; b.z=clamp(b.z,FLOOR_N,FLOOR_S);
-    b.x=clamp(b.x,camLock+30,camLock+W-30);
-    b.cd--;
-    if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='recover'; b.st=0;
-      shake=6; rumble(220,.6,.5,true); say(b.x,b.z-70,'STAGGERED',b.pal.glow); return; }
-    if(b.cd<=0){ b.move='boot'; b.state='wind'; b.st=0; }
+  if(b.phase==='dizzy'){                             // exhausted his energy — fully vulnerable, no attacks
+    b.st++; b.weakOpen=999;
+    if(b.st%14===0) puff(b.x+rnd(-16,16),b.z,rnd(0,10),1,'#6b6478');
     return;
   }
-  // phase === 'gun' — he backs to the wall and sprays the whole screen, Galaga-style
-  b.x=clamp(b.x, camLock+W-96, camLock+W-44);
-  if(b.state==='draw'){ b.st++; b.weakOpen=0;
-    if(b.st>=26){ b.state='fire'; b.st=0; b.shots=0; } return; }
-  if(b.state==='reload'){ b.st++; b.weakOpen=6;             // OPEN: he's vulnerable until the mag's back in
-    if(b.st===1){ say(b.x,b.z-84,'RELOADING','#3ad1ff'); blip(300,.05); }
-    if(b.st>=90){ b.state='fire'; b.st=0; b.shots=0; } return; }
-  // firing
-  b.st++; b.weakOpen=0;
-  if(b.st%5===0 && b.shots<30){
-    b.shots++;
-    const row=FLOOR_N + ((b.shots*53)%(FLOOR_S-FLOOR_N+1));  // sweep the depth band like a bullet curtain
-    fires.push({x:b.x+b.face*18, z:row, y:22, vx:b.face*6.4, vz:0, vy:0, r:5, life:130, max:130, foe:true, bullet:true, sober:S_LIGHT});
-    blip(170,.03); if(b.shots%6===0) shake=2;
-  }
-  if(b.shots>=30){ b.state='reload'; b.st=0; }             // mag empty → reload window
-}
-
-// ---- THE TRACK WORKER: melee, but every few seconds he hops down and a train sweeps the back rail ----
-const TRACK_Z = FLOOR_N+22;                                // the danger line — anything north of this eats the train
-function updateSubway(b,dx,dz,d){
-  const ch=heavyHitAt();
-  if(b.trainCd>0) b.trainCd--;
-  // the train sequence: retreat → warn → sweep → climb back up
-  if(b.state==='retreat'){ b.st++; b.z=FLOOR_N-2;          // he drops onto the rail (untouchable)
-    if(b.st===1){ b.trainDir = b.face>0 ? 1 : -1;          // fixed sweep direction, locked at the start
-      b.trainX = b.trainDir>0 ? camLock-60 : camLock+W+60; say(P.x,P.z-40,'OFF THE TRACKS!','#ffd23a'); }
-    if(b.st>=54){ b.state='train'; b.st=0; }               // ~0.9s warning
-    return; }
-  if(b.state==='train'){ b.st++;
-    b.trainX += b.trainDir*11;                             // one direction, all the way across
-    if(b.st%3===0) shake=Math.max(shake,5); if(b.st%8===0) rumble(500,1,.6,true);
-    // anyone standing up on the rail as it passes gets flattened and thrown clear
-    if(P.z < TRACK_Z && Math.abs(P.x-b.trainX)<70 && P.iframes<=0){
-      hurtPlayer(ch+12,b.trainX,S_HEAVY); P.z=Math.min(FLOOR_S,P.z+34); }
-    if(b.trainX < camLock-80 || b.trainX > camLock+W+80){ b.state='climb'; b.st=0; }
-    return; }
-  if(b.state==='climb'){ b.st++; b.z=FLOOR_N+12; if(b.st>=20){ b.state='idle'; b.cd=rnd(45,75); b.trainCd=rnd(300,420); } return; }
+  // phase === 'notices' — throws a fanned volley of eviction notices from range
   if(b.state==='recover'){ b.st++; b.weakOpen=6; if(b.st>=46){ b.state='idle'; b.cd=rnd(40,70); } return; }
-  if(b.state==='wind'){ b.st++; if(b.st===1) blip(60,.06); if(b.st>=20){ b.state='attack'; b.st=0; b.hitDone=false; } return; }
+  if(b.state==='wind'){ b.st++; if(b.st===1) blip(60,.06); if(b.st>=22){ b.state='attack'; b.st=0; b.hitDone=false; } return; }
   if(b.state==='attack'){ b.st++;
-    if(b.st>8 && b.st<18){                                 // a two-boot transit kick
-      if(!b.hitDone && Math.abs(P.x-(b.x+b.face*46))<48 && Math.abs(P.z-b.z)<24){ hurtPlayer(ch+4,b.x,S_HEAVY); b.hitDone=true; } }
-    if(b.st>=26){ b.state='recover'; b.st=0; }
+    if(b.st===6 && !b.hitDone){ const dir=b.face;
+      for(let i=-1;i<=1;i++)
+        fires.push({x:b.x+dir*18, z:b.z, y:26, vx:dir*rnd(4.2,4.8), vz:i*0.7, vy:0, r:7, life:110, max:110, foe:true, paper:true, spin:(i+1)*2});
+      blip(140,.05); say(b.x,b.z-70,"YOU'VE BEEN SERVED",b.pal.glow); b.hitDone=true; }
+    if(b.st>=30){ b.state='recover'; b.st=0; }
     b.x=clamp(b.x,camLock+30,camLock+W-30); return; }
   // idle / approach
   b.st++;
-  if(d>48) b.x+=b.face*b.spd;
-  b.z+=clamp(dz,-1,1)*b.spd*0.4; b.z=clamp(b.z,FLOOR_N+12,FLOOR_S);
+  const want=100;
+  if(d>want+16) b.x+=b.face*b.spd; else if(d<want-16) b.x-=b.face*b.spd*0.7;
+  b.z+=clamp(dz,-1,1)*b.spd*0.35; b.z=clamp(b.z,FLOOR_N,FLOOR_S);
   b.x=clamp(b.x,camLock+30,camLock+W-30);
   b.cd--;
-  if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='recover'; b.st=0; shake=6; say(b.x,b.z-70,'STAGGERED',b.pal.glow); return; }
-  if(b.trainCd<=0){ b.state='retreat'; b.st=0; return; }   // train time — priority over the melee
-  if(b.cd<=0){ b.move='kick'; b.state='wind'; b.st=0; }
+  if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='recover'; b.st=0;
+    shake=6; rumble(220,.6,.5,true); say(b.x,b.z-70,'STAGGERED',b.pal.glow); return; }
+  if(b.cd<=0){ b.move='notice'; b.state='wind'; b.st=0; }
 }
 
-// ---- THE CART MAN: lobs sizzling skewers, and periodically ducks behind his cart (a moving shield) ----
-function updateHalal(b,dx,dz,d){
-  const ch=heavyHitAt();
-  if(b.duckCd>0) b.duckCd--;
-  if(b.state==='duck'){ b.st++;                            // hunkered behind the cart — untouchable
-    if(b.st>=64){ b.state='idle'; b.cd=rnd(35,60); b.duckCd=rnd(200,300); } return; }
-  if(b.state==='recover'){ b.st++; b.weakOpen=6; if(b.st>=44){ b.state='idle'; b.cd=rnd(40,68); } return; }
-  if(b.state==='wind'){ b.st++; if(b.st===1) blip(70,.05); if(b.st>=b.windLen){ b.state='attack'; b.st=0; b.hitDone=false; } return; }
-  if(b.state==='attack'){ b.st++;
-    if(b.move==='skewer'){                                 // lob an arcing skewer off the grill
-      if(b.st===6){ const dir=b.face;
-        fires.push({x:b.x+dir*16, z:b.z, y:34, vx:dir*rnd(3.6,4.6), vz:0, vy:0.9, r:5, life:70, max:70, foe:true, skewer:true, sober:S_LIGHT});
-        blip(150,.05); } }
-    else if(b.move==='slap'){                              // hot grill backhand if you crowd him
-      if(b.st>6 && b.st<16 && !b.hitDone && Math.abs(P.x-(b.x+b.face*40))<44 && Math.abs(P.z-b.z)<22){ hurtPlayer(ch+6,b.x,S_HEAVY); b.hitDone=true; } }
-    if(b.st>=b.atkLen){ b.state='recover'; b.st=0; }
-    b.x=clamp(b.x,camLock+30,camLock+W-30); return; }
-  // idle / approach — keeps mid range, cart out front
-  b.st++;
-  const want=72;
-  if(d>want+14) b.x+=b.face*b.spd; else if(d<want-14) b.x-=b.face*b.spd*0.7;
-  b.z+=clamp(dz,-1,1)*b.spd*0.35; b.z=clamp(b.z,FLOOR_N+8,FLOOR_S);
-  b.x=clamp(b.x,camLock+30,camLock+W-30);
-  b.cd--;
-  if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='recover'; b.st=0; shake=6; say(b.x,b.z-70,'STAGGERED',b.pal.glow); return; }
-  if(b.duckCd<=0){ b.state='duck'; b.st=0; say(b.x,b.z-64,'BEHIND THE CART',b.pal.glow); return; }
-  if(b.cd<=0){ const close=d<58; b.move=close?'slap':'skewer';
-    b.windLen= close?12:14; b.atkLen= close?24:22; b.state='wind'; b.st=0; }
-}
-
-// ---- THE AUTEUR: a twitchy director. 🎬 clapper shots, a broom tornado that tosses you airborne,
-//      and a compulsive TIDY he can't resist — his one wide-open window. Interrupt it or he buffs up. ----
-function launchPlayer(dmg,fromX){                          // scooped off your feet and thrown
-  if(P.iframes>0||OPT.inv) return;
-  hurtPlayer(dmg,fromX,S_LIGHT);                           // registers the hit + knockdown
-  P.vy=5.6; P.y=Math.max(P.y,4); P.downT=Math.max(P.downT,52);   // …then flung way up
-  say(P.x,P.z-30,'WHEEEE','#e23b3b'); shake=Math.max(shake,7);
-}
-// the lawyer's briefcase pops open and dumps you back onto the pavement
-function releaseCage(b,escaped){
-  P.cageB=null; P.struggle=0;
-  P.state='down'; P.downT=escaped?28:52; P.iframes=escaped?44:64;
-  P.vy=escaped?3.2:1.8; P.y=Math.max(P.y,2); P.knockV=(P.x<b.x?-1:1)*(escaped?5:4); P.x+=P.knockV;
-  shake=Math.max(shake,8); rumble(300,.9,.6,true);
-  say(P.x,P.z-30, escaped?'BROKE OUT':'CASE DISMISSED', escaped?'#c9d13a':'#ff2e88');
-}
-function updateAuteur(b,dx,dz,d){
-  const ch=heavyHitAt(); const fast=b.buffT>0?0.6:1;          // "PERFECT." buff speeds his recovery/cooldown
-  if(b.tidyCd>0) b.tidyCd--; if(b.buffT>0) b.buffT--;
-  if(b.state==='tidy'){ b.st++; b.weakOpen=8;             // compulsion: fixated, sweeping one spot — WIDE OPEN
+// ---- B.I.G. FARMA: throws pills/syringes → self-injects for a strength buff → crashes when it wears off ----
+function updateFarma(b,dx,dz,d){
+  const fast=b.buffT>0?0.6:1;                          // strength buff also speeds his recovery/cooldown
+  if(b.buffCd>0) b.buffCd--; if(b.buffT>0){ b.buffT--; if(b.buffT===0){ b.state='crash'; b.st=0; } }
+  if(b.state==='crash'){ b.st++; b.weakOpen=8;          // the high wears off — fixated, WIDE OPEN
     if(b.st%6===0) puff(b.x+rnd(-24,24),b.z,rnd(0,4),1,'#6b6478');
-    if(b.st>=96){ b.state='idle'; b.cd=30; b.buffT=300;   // survived uninterrupted → he gets his shot
-      say(b.x,b.z-72,'PERFECT.',b.pal.glow); blip(520,.07); } return; }
+    if(b.st>=90){ b.state='idle'; b.cd=30; say(b.x,b.z-72,'BACK ON MY FEET','#2fffa8'); } return; }
   if(b.state==='recover'){ b.st++; b.weakOpen=6; if(b.st>=Math.round(46*fast)){ b.state='idle'; b.cd=rnd(40,68)*fast; } return; }
   if(b.state==='wind'){ b.st++; if(b.st===1) blip(70,.05);
     if(b.st>=b.windLen){ b.state='attack'; b.st=0; b.hitDone=false;
-      if(b.move==='clap'){ say(b.x,b.z-70,'ACTION!','#e23b3b'); }
-      if(b.move==='tornado'){ say(b.x,b.z-70,'I CAN\'T WORK LIKE THIS','#e23b3b'); } } return; }
+      if(b.move==='throw'){ say(b.x,b.z-70,'TAKE YOUR MEDICINE','#2fffa8'); }
+      if(b.move==='inject'){ say(b.x,b.z-70,"IT'S FOR MY OWN GOOD",'#ff2e88'); } } return; }
   if(b.state==='attack'){ b.st++;
-    if(b.move==='clap'){                                   // snap the clapperboard shut → a spinning 🎬 flies out
+    if(b.move==='throw'){                                // hurl a fistful of pills/syringes
       if(b.st===5){ const dir=b.face;
-        fires.push({x:b.x+dir*18, z:b.z, y:24, vx:dir*4.4, vz:0, vy:0, r:7, life:120, max:120, foe:true, clap:true, sober:S_LIGHT});
+        fires.push({x:b.x+dir*18, z:b.z, y:24, vx:dir*4.4, vz:0, vy:0, r:7, life:120, max:120, foe:true, clap:true});
         blip(120,.06); } }
-    else if(b.move==='tornado'){                           // the broom whips up a twister that walks at you
-      if(b.st===8){ const dir=b.face;
-        fires.push({x:b.x+dir*20, z:b.z, y:0, vx:dir*2.4, vz:0, vy:0, r:16, life:150, max:150, foe:true, tornado:true, spin:0});
-        rumble(360,.9,.6,true); shake=5; } }
+    else if(b.move==='inject'){                          // self-injects — a temporary strength boost
+      if(b.st===8){ b.buffT=300; b.dmg=Math.round(b.dmg*1.5);
+        for(let i=0;i<16;i++) puff(b.x+rnd(-20,20),b.z,rnd(0,b.h*0.6),1,'#2fffa8');
+        rumble(360,.9,.6,true); shake=5; say(b.x,b.z-84,'STRONGER!','#2fffa8'); } }
     if(b.st>=b.atkLen){ b.state='recover'; b.st=0; }
     b.x=clamp(b.x,camLock+30,camLock+W-30); return; }
-  // idle / approach — he keeps a directorial distance
+  // idle / approach — he keeps his distance until it's time to dose up
   b.st++;
   const want=90;
   if(d>want+16) b.x+=b.face*b.spd; else if(d<want-16) b.x-=b.face*b.spd*0.7;
   b.z+=clamp(dz,-1,1)*b.spd*0.35; b.z=clamp(b.z,FLOOR_N+8,FLOOR_S);
   b.x=clamp(b.x,camLock+30,camLock+W-30);
   b.cd--;
-  if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='recover'; b.st=0; b.buffT=0;   // hurting him breaks the buff
+  if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='recover'; b.st=0;
     shake=6; rumble(220,.6,.5,true); say(b.x,b.z-70,'STAGGERED',b.pal.glow); return; }
-  if(b.tidyCd<=0){ b.state='tidy'; b.st=0; b.tidyCd=rnd(300,420);
-    say(b.x,b.z-64,'THIS SET IS A MESS','#e23b3b'); return; }
-  if(b.cd<=0){ b.move= Math.random()<0.5?'clap':'tornado';
-    b.windLen= b.move==='tornado'?26:16; b.atkLen= b.move==='tornado'?24:22; b.state='wind'; b.st=0; }
+  if(b.buffCd<=0 && b.buffT<=0){ b.move='inject'; b.windLen=20; b.atkLen=16; b.state='wind'; b.st=0; b.buffCd=rnd(340,460); return; }
+  if(b.cd<=0){ b.move='throw'; b.windLen=16; b.atkLen=22; b.state='wind'; b.st=0; }
 }
 
-// ---- THE TOURIST: steps off a street-blocking tour bus. lines up a shot (viewfinder telegraph),
-//      then the flash HITS everyone in frame. leave the photo's box before the snap to stay safe. ----
-function updateTourist(b,dx,dz,d){
-  const ch=heavyHitAt();
-  if(b.state==='recover'){ b.st++; b.weakOpen=6; if(b.st>=46){ b.state='idle'; b.cd=rnd(42,72); } return; }
-  if(b.state==='wind'){ b.st++;                          // AIMING: the viewfinder frames where you're standing NOW
-    if(b.st===1){ b.photo={x:P.x, z:P.z, rw:62, rd:32}; blip(80,.05); }
-    if(b.st>=b.windLen){ b.state='attack'; b.st=0; b.hitDone=false; } return; }
+// ---- THE PRESIDENT: summons police/soldiers, calls in missile strikes, and runs from a fight he
+//      can't win. Survive him long enough and one good punch is all it takes. ----
+const STRIKE_WARN=54;
+function updatePresident(b,dx,dz,d){
+  if(b.strikeCd>0) b.strikeCd--; if(b.summonCd>0) b.summonCd--;
+  if(b.finalPhase){ b.st++; b.weakOpen=999;             // survived his whole playbook — wide open, one punch ends it
+    if(b.st%16===0) puff(b.x+rnd(-16,16),b.z,rnd(0,10),1,'#6b6478');
+    return; }
+  // missile-strike sequence: incoming warning → impact zone → all clear
+  if(b.state==='incoming'){ b.st++;
+    if(b.st===1){ b.strikeX=P.x+rnd(-40,40); say(P.x,b.z-46,'INCOMING!','#ff2e88'); blip(90,.05); }
+    if(b.st%10===0) shake=Math.max(shake,3);
+    if(b.st>=STRIKE_WARN){ b.state='strike'; b.st=0; } return; }
+  if(b.state==='strike'){ b.st++;
+    if(b.st===1){ shake=14; hitstop=6; rumble(700,1,1,true); camFlash=Math.max(camFlash,0.6); blip(80,.14);
+      for(let i=0;i<26;i++) puff(b.strikeX+rnd(-30,30),FLOOR_S-6,rnd(0,20),1,i%2?'#ff5a2e':'#e8e2d4');
+      if(Math.abs(P.x-b.strikeX)<50 && P.iframes<=0) hurtPlayer(heavyHitAt()+10,b.strikeX);
+      b.strikeCount=(b.strikeCount||0)+1; }
+    if(b.st>=20){ b.state='idle'; b.cd=rnd(40,70); b.strikeCd=rnd(280,380);
+      if(b.strikeCount>=3){ b.finalPhase=true; b.st=0; b.hp=1;
+        say(b.x,b.z-90,"THAT'S ALL I'VE GOT",'#ff2e88'); shake=10; rumble(500,1,.8,true); } }
+    return; }
+  if(b.state==='recover'){ b.st++; b.weakOpen=6; if(b.st>=46){ b.state='idle'; b.cd=rnd(40,70); } return; }
+  if(b.state==='wind'){ b.st++; if(b.st===1) blip(60,.06); if(b.st>=20){ b.state='attack'; b.st=0; b.hitDone=false; } return; }
   if(b.state==='attack'){ b.st++;
-    if(b.move==='photo'){
-      if(b.st===3 && !b.hitDone){                        // SNAP — the flash catches anyone still in frame
-        camFlash=1; shake=8; rumble(300,1,.6,true); blip(950,.05);
-        const f=b.photo;
-        if(f && Math.abs(P.x-f.x)<f.rw && Math.abs(P.z-f.z)<f.rd && P.iframes<=0) hurtPlayer(ch+8,f.x,S_HEAVY);
-        b.hitDone=true; } }
-    else if(b.move==='bonk'){                            // camera to the face if you crowd him
-      if(b.st>8 && b.st<16 && !b.hitDone && Math.abs(P.x-(b.x+b.face*40))<44 && Math.abs(P.z-b.z)<22){ hurtPlayer(ch+4,b.x,S_HEAVY); b.hitDone=true; } }
-    if(b.st>=b.atkLen){ b.state='recover'; b.st=0; b.photo=null; }
+    if(b.st>8 && b.st<18){                                 // a shove if you actually corner him
+      if(!b.hitDone && Math.abs(P.x-(b.x+b.face*46))<48 && Math.abs(P.z-b.z)<24){ hurtPlayer(heavyHitAt()+4,b.x); b.hitDone=true; } }
+    if(b.st>=26){ b.state='recover'; b.st=0; }
     b.x=clamp(b.x,camLock+30,camLock+W-30); return; }
-  // idle / approach — he wants camera distance, not a hug
+  // idle — he runs from you, closing only if you corner him against the edge
   b.st++;
-  const want=112;
-  if(d>want+18) b.x+=b.face*b.spd; else if(d<want-18) b.x-=b.face*b.spd*0.8;
-  b.z+=clamp(dz,-1,1)*b.spd*0.4; b.z=clamp(b.z,FLOOR_N+8,FLOOR_S);
-  b.x=clamp(b.x,camLock+30,camLock+W-30);
-  b.cd--;
-  if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='recover'; b.st=0; shake=6; say(b.x,b.z-70,'STAGGERED',b.pal.glow); return; }
-  if(b.cd<=0){ const close=d<58; b.move=close?'bonk':'photo';
-    b.windLen= close?12:30; b.atkLen= close?24:14; b.state='wind'; b.st=0;
-    if(!close) say(b.x,b.z-72,'SAY CHEESE!',b.pal.glow); }
-}
-
-// ---- THE LAWYER: a suit who works you from range with a fanned-out volley of subpoenas, then
-//      brings the gavel DOWN — a ground shockwave that rolls out both ways. jump the wave, close
-//      the gap on his recover. crowd him and you eat a briefcase backhand. ----
-function updateLawyer(b,dx,dz,d){
-  const ch=heavyHitAt();
-  if(b.state==='recover'){ b.st++; b.weakOpen=6; if(b.st>=48){ b.state='idle'; b.cd=rnd(42,70); } return; }  // planted after a move = the opening
-  if(b.state==='wind'){ b.st++; if(b.st===1) blip(70,.05);
-    if(b.st>=b.windLen){ b.state='attack'; b.st=0; b.hitDone=false;
-      if(b.move==='gavel') say(b.x,b.z-72,'ORDER!','#e0483a');
-      if(b.move==='lockup') say(b.x,b.z-72,'COUNSEL APPROACHES','#e0483a'); } return; }
-  if(b.state==='attack'){ b.st++;
-    if(b.move==='subpoena'){                               // serve a fanned volley of three spinning papers
-      if(b.st===6 && !b.hitDone){ const dir=b.face;
-        for(let i=-1;i<=1;i++)
-          fires.push({x:b.x+dir*18, z:b.z, y:26, vx:dir*rnd(4.2,4.8), vz:i*0.7, vy:0, r:7, life:110, max:110, foe:true, paper:true, spin:(i+1)*2, sober:S_LIGHT});
-        blip(140,.05); say(b.x,b.z-70,"YOU'VE BEEN SERVED",b.pal.glow); b.hitDone=true; } }
-    else if(b.move==='gavel'){                             // SLAM → a fixed stomp AND two rings that roll out along the ground
-      if(b.st===12 && !b.hitDone){ shake=12; rumble(300,1,.6,true); blip(360,.06);
-        if(P.y<26 && Math.abs(P.x-b.x)<86) hurtPlayer(ch+8,b.x,S_HEAVY);   // right at his feet on the slam
-        for(let i=0;i<18;i++) puff(b.x+rnd(-60,60),b.z,rnd(0,10),1,'#6b6478');
-        fires.push({x:b.x-34,z:b.z,y:0,vx:-3.2,vz:0,vy:0,r:10,life:44,max:44,foe:true,shock:true,sober:S_HEAVY});
-        fires.push({x:b.x+34,z:b.z,y:0,vx: 3.2,vz:0,vy:0,r:10,life:44,max:44,foe:true,shock:true,sober:S_HEAVY});
-        b.hitDone=true; } }
-    else if(b.move==='backhand'){                          // briefcase across the jaw if you crowd him
-      if(b.st>6 && b.st<16 && !b.hitDone && Math.abs(P.x-(b.x+b.face*40))<44 && Math.abs(P.z-b.z)<22){ hurtPlayer(ch+5,b.x,S_HEAVY); b.hitDone=true; } }
-    else if(b.move==='lockup'){                            // snap the briefcase shut ON you, then bang it on the pavement
-      if(b.st===4 && !b.hitDone){ b.hitDone=true;
-        if(P.state!=='caged' && P.iframes<=0 && !OPT.inv && P.y<28 && Math.abs(P.x-(b.x+b.face*40))<54 && Math.abs(P.z-b.z)<26){
-          P.state='caged'; P.cageB=b; P.struggle=0; b.caged=true; b.slams=0;
-          say(b.x,b.z-72,'IN CONTEMPT',b.pal.glow); blip(160,.06); }
-        else { b.caged=false; say(b.x,b.z-70,'OVERRULED','#5c5670'); blip(120,.04); b.state='recover'; b.st=0; return; } }   // grab whiffed → wide open
-      if(b.caged && P.state==='caged'){
-        P.x=b.x+b.face*24; P.z=b.z+8; P.y=0;               // held out front & low, stuffed in the case (in front of him)
-        if(b.st>=18 && b.slams<3 && (b.st-18)%16===0){     // three bangs on a cadence
-          b.slams++; shake=12; rumble(320,1,.6,true); blip(300,.06);
-          for(let i=0;i<12;i++) puff(P.x+rnd(-18,18),P.z,rnd(0,8),1,'#6b6478');
-          const dmg=Math.max(3,(ch+5)-(P.struggle||0)*0.5);   // struggling softens each bang
-          loseHeart(dmg); P.hitFlash=12;
-          say(P.x,P.z-40,'SLAM!','#ff2e88'); }
-        const escaped=(P.struggle||0)>=8;                  // mashed the latches open
-        if(escaped || (b.slams>=3 && b.st>=58)){ releaseCage(b,escaped); b.caged=false; b.state='recover'; b.st=0; return; } } }
-    if(b.st>=b.atkLen){ if(P.state==='caged') releaseCage(b,false); b.caged=false; b.state='recover'; b.st=0; }
-    b.x=clamp(b.x,camLock+30,camLock+W-30); return; }
-  // idle / approach — he keeps a courtroom distance and works the range
-  b.st++;
-  const want=100;
-  if(d>want+16) b.x+=b.face*b.spd; else if(d<want-16) b.x-=b.face*b.spd*0.7;
+  if(d<160) b.x-=b.face*b.spd; else if(d>230) b.x+=b.face*b.spd*0.4;
   b.z+=clamp(dz,-1,1)*b.spd*0.35; b.z=clamp(b.z,FLOOR_N+8,FLOOR_S);
   b.x=clamp(b.x,camLock+30,camLock+W-30);
   b.cd--;
   if(b.dmgTaken>b.maxhp*0.15){ b.dmgTaken=0; b.state='recover'; b.st=0; shake=6; say(b.x,b.z-70,'STAGGERED',b.pal.glow); return; }
-  if(b.cd<=0){ const close=d<64;
-    b.move= close?(Math.random()<0.5?'lockup':'backhand'):(Math.random()<0.5?'gavel':'subpoena');
-    b.windLen= b.move==='gavel'?22:(b.move==='lockup'?18:(b.move==='backhand'?12:16));
-    b.atkLen=  b.move==='gavel'?30:(b.move==='lockup'?74:(b.move==='backhand'?24:22));
-    b.state='wind'; b.st=0; }
+  if(b.strikeCd<=0){ b.state='incoming'; b.st=0; return; }   // strike time — priority over everything
+  if(b.summonCd<=0){ b.summonCd=rnd(420,560);
+    const nH=2; for(let i=0;i<nH;i++){ const hx=clamp(b.x+b.face*(60+i*30), camLock+40, camLock+W-40);
+      ents.push(sammich(hx, FLOOR_N+18+i*22)); }
+    say(b.x,b.z-84,'GET IN HERE!','#ff2e88'); return; }
+  if(d<70 && b.cd<=0){ b.move='shove'; b.state='wind'; b.st=0; }
 }
 
 //====================== combat ======================
@@ -2192,11 +1962,8 @@ function update(){
 
   //---- fire lives on the pavement for a second after it leaves the mouth
   for(const f of fires){ f.x+=f.vx; f.z+=f.vz; f.y+=f.vy;
-    if(f.skewer){ f.vy-=0.07; }                          // skewers arc — rise then fall
-    else if(f.weapon){ f.spin=(f.spin||0)+0.5; }         // a thrown weapon flies straight, tumbling
-    else if(f.tornado){ f.spin=(f.spin||0)+0.5;          // the twister stalks your row and creeps toward you
-      f.vx = (P.x<f.x?-1:1)*Math.abs(f.vx); f.z += clamp(P.z-f.z,-0.5,0.5); }
-    else if(!f.bullet && !f.clap && !f.paper && !f.shock && !f.plasma){ f.vx*=0.965; f.r+=0.30; }   // plain fire spreads; bullets/claps/papers/plasma fly straight
+    if(f.weapon){ f.spin=(f.spin||0)+0.5; }              // a thrown weapon flies straight, tumbling
+    else if(!f.clap && !f.paper && !f.plasma){ f.vx*=0.965; f.r+=0.30; }   // plain fire spreads; claps/papers/plasma fly straight
     f.life--;
     if(f.life<0){ f.gone=true; continue; }
     if(f.foe===false){                                 // your fireball / thrown weapon — hits whoever it catches
@@ -2215,18 +1982,8 @@ function update(){
         } }
       continue;
     }
-    if(f.tornado){                                       // catches you on the ground → tossed way up
-      if(Math.abs(f.x-P.x)<f.r+8 && Math.abs(f.z-P.z)<f.r*0.5+10 && P.iframes<=0 && P.y<30){
-        launchPlayer(heavyHitAt()+4, f.x); f.gone=true; }     // one big toss, then it dissipates
-      continue;
-    }
-    if(f.shock){ f.r+=1.4;                               // the gavel wave rolls out along the pavement — JUMP it
-      if(Math.abs(f.x-P.x)<f.r*0.4+8 && Math.abs(f.z-P.z)<16 && P.iframes<=0 && P.y<24){
-        hurtPlayer(heavyHitAt()+6, f.x, f.sober||0); f.gone=true; }
-      continue;
-    }
     if(Math.abs(f.x-P.x)<f.r*0.8+9 && Math.abs(f.z-P.z)<f.r*0.4+9 && P.y<26)
-      hurtPlayer(f.plasma?11:(f.bullet?7:(f.clap?8:(f.r>7?9:6))), f.x, f.sober||0);
+      hurtPlayer(f.plasma?11:(f.clap?8:(f.r>7?9:6)), f.x);
   }
   fires=fires.filter(f=>!f.gone);
 
@@ -2696,198 +2453,62 @@ function drawBoss(b){
   const E=(x,yc,rx,ry,col)=>{ ctx.fillStyle=col; ctx.beginPath();
     ctx.ellipse(sx+x*f*S, gy-yc*S*G+bob, rx*S, ry*S*G, 0,0,7); ctx.fill(); };
 
-  if(b.arch==='bouncer'){
-    const stomp=winding&&b.move==='stomp';
-    const fist= stomp ? (b.state==='wind'? 28+b.st*0.2 : 28-Math.min(30,b.st*1.7)) : 14+Math.sin(b.anim*2)*1.4;
-    R(-5,0,6,12,dark); R(5,0,6,12,dark);                 // legs
-    R(0,10,20,14,body);                                  // torso slab
-    R(0,22,26,5,dark);                                   // shoulders
-    R(-13,fist-8,7,9,body); R(13,fist-8,7,9,body);       // upper arms
-    R(-14,fist-9,8,7,dark); R(14,fist-9,8,7,dark);       // fists
-    R(0,25,9,8,body);                                    // head
-    R(-2.4,29,1.6,1.6,glow); R(2.4,29,1.6,1.6,glow);     // eyes
-    glowBlob(0,17,3.4);                                  // heart (weak point)
-  }
-  else if(b.arch==='ratking'){
-    const rear=(winding&&b.move==='fire')?-Math.min(4,b.st*0.2):0;   // rocks back to spit
-    ctx.strokeStyle=dark; ctx.lineWidth=3.6*S*G;         // tail, whipping
-    ctx.beginPath(); ctx.moveTo(sx-f*15*S, gy-9*S*G+bob);
-    ctx.quadraticCurveTo(sx-f*36*S, gy-18*S*G+Math.sin(t*.07)*9, sx-f*46*S, gy-1*S*G);
-    ctx.stroke();
-    // four legs — hind pair heavier, front pair reaching, each with its own step phase
-    R(-12,0,4.5,9+Math.max(0,Math.sin(t*.2))*2.5,dark); R(-6,0,4.5,9+Math.max(0,Math.sin(t*.2+2.1))*2.5,dark);
-    R(5,0,4,8+Math.max(0,Math.sin(t*.2+3.1))*2.2,dark);  R(11,0,4,8+Math.max(0,Math.sin(t*.2+1))*2.2,dark);
-    E(-8,15,13,14,dark);                                 // rear haunch (tall, hunched)
-    E(3+rear*0.4,13,15,12,body);                         // main torso, sloping down to the shoulders
-    for(let i=0;i<b.segs;i++){ const u=i/Math.max(1,b.segs-1); E(-11+u*24, 23-u*4+Math.sin(u*3.14)*3, 2.4,2.8, dark); } // spine ridge
-    E(17+rear,13+rear*0.5,9,9,body);                     // head
-    R(23+rear,9+rear*0.5,10,7,body);                     // snout
-    E(31+rear,10+rear*0.5,2.6,2.6,'#1a1620');            // nose
-    R(24+rear,8+rear*0.5,5,2.5,'#b9b2cf');               // front teeth
-    R(13,22,4,7,dark); R(18,23,4,6,dark);                // ears
-    R(12,26,2.6,4,glow); R(16,27,2.6,5,glow); R(20,26,2.6,4,glow);   // crown (it's a king)
-    if(winding&&b.move==='fire') glowBlob(30+rear,11+rear*0.5,3.8);  // maw charging fire
-    glowBlob(18+rear,15+rear*0.5,2.2); R(17.5+rear,14.5+rear*0.5,2,2,'#ff2e88');  // eye (weak point)
-  }
-  else if(b.arch==='deli'){
-    const gun=b.phase==='gun', firing=gun&&b.state==='fire'&&b.st%5<3;
-    R(-5,0,6,13,'#2b2620'); R(5,0,6,13,'#2b2620');       // work pants
-    R(-5,0,7,4,'#caa14a'); R(5,0,7,4,'#caa14a');         // tan timbs on his feet
-    R(0,11,20,16,body);                                  // apron torso
-    R(0,11,20,3,dark);                                   // apron tie / meat stain
-    R(0,20,22,5,dark);                                   // butcher-coat shoulders
+  if(b.arch==='landlord'){
+    const dizzy=b.phase==='dizzy', notice=winding&&b.move==='notice';
+    R(-5,0,6,13,'#3a2f1a'); R(5,0,6,13,'#3a2f1a');       // cheap suit pants
+    R(-5,0,7,4,'#1a140a'); R(5,0,7,4,'#1a140a');         // shoes
+    R(0,11,20,16,body);                                  // suit jacket
+    R(0,20,22,5,dark);                                   // shoulders
     R(0,26,9,8,'#c98d6a');                               // ruddy face
     R(-2.4,30,1.6,1.6,'#1a1620'); R(2.4,30,1.6,1.6,'#1a1620');   // eyes
     R(1,28.5,5,1.6,'#5a4636');                           // mustache
-    R(0,33,10,4,'#eef0ee');                              // paper hat
-    if(b.phase==='boot'){
-      const raise= b.state==='wind'? 12+b.st*0.5 : b.state==='attack'? Math.max(-6,12-b.st*1.4) : 6;
-      R(12,15,6,8,body);                                 // swinging arm
-      R(16,14+raise,9,11,'#caa14a');                     // the timberland boot
-      R(19,14+raise-2,5,4,'#8a6a24');                    // toe cap
-      R(13,14+raise+9,12,3,'#6a4e18');                   // ridged sole
-    } else if(gun){
-      R(13,16,10,4,body);                                // extended arm
-      R(20,16,6,4,'#22242e');                            // pistol
-      if(firing){ glowBlob(26,17,3.2); R(24,16,4,3,'#ffd23a'); }   // muzzle flash
+    if(!dizzy) R(0,20,3,6,glow);                          // cheap tie
+    if(notice){
+      R(12,15,6,8,body);                                 // throwing arm
+      R(18,16,7,9,'#efe9d8');                             // notice in hand
+    } else if(dizzy){
+      ctx.globalAlpha=.5+.5*Math.sin(t*.5); ctx.fillStyle=glow;
+      ctx.font='bold 10px "JetBrains Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText('✦', sx, gy-(b.h+6)*G+bob); ctx.globalAlpha=1;
+      R(-11,15,6,9,body); R(11,15,6,9,body);
     } else {
       R(-11,15,6,9,body); R(11,15,6,9,body);             // both arms out (guard)
     }
     glowBlob(0,17,3.4);                                  // gut (weak point)
   }
-  else if(b.arch==='subway'){
-    const kick=b.state==='attack', onRail=b.state==='retreat'||b.state==='train'||b.state==='climb';
-    R(-5,0,6,13,dark); R(5,0,6,13,dark);                 // grey work pants
-    R(0,11,18,16,body);                                  // safety-orange vest
-    R(0,12,18,2,'#ffe9a0'); R(0,17,18,2,'#ffe9a0');      // reflective stripes
-    R(0,20,20,4,dark);                                   // shoulders
-    R(0,26,9,8,'#b98a5a');                               // face
-    R(-2.4,30,1.6,1.6,'#1a1620'); R(2.4,30,1.6,1.6,'#1a1620');   // eyes
-    R(0,32,11,4,glow);                                   // hard hat
-    if(kick){ R(14,4,9,5,dark); R(20,4,4,4,'#1a1620'); } // transit boot thrust
-    else { R(-11,15,5,8,body); R(11,15,5,8,body); }      // arms
-    R(13,18,3,10,'#2a2622'); glowBlob(13,26,2.4);        // signal lantern, lit
-    if(onRail){ ctx.globalAlpha=.4+.4*Math.sin(t*.6); ctx.fillStyle=glow;   // "on the tracks" shimmer
-      ctx.font='bold 9px "JetBrains Mono",monospace'; ctx.textAlign='center';
-      ctx.fillText('⚠', sx, gy-(b.h+4)*G+bob); ctx.globalAlpha=1; }
-    glowBlob(0,15,3.0);                                  // chest (weak point)
-  }
-  else if(b.arch==='halal'){
-    const ducked=b.state==='duck', drop=ducked?-7:0, throwArm=b.state==='attack'&&b.move==='skewer'&&b.st<10;
-    // vendor (behind the cart)
-    R(-4,0,5,12,dark); R(4,0,5,12,dark);                 // legs
-    R(0,10+drop,13,13,'#3a6ea5');                        // blue shirt torso
-    R(0,21+drop,8,7,'#b98a5a');                          // head
-    R(-2,24+drop,1.4,1.4,'#1a1620'); R(2,24+drop,1.4,1.4,'#1a1620');   // eyes
-    R(1,22.5+drop,4,1.4,'#3a2e22');                      // mustache
-    R(0,27+drop,9,3,'#eef0ee');                          // vendor cap
-    if(throwArm) R(-9,20+drop,6,4,'#b98a5a');            // cocked throwing arm (skewer already flying)
-    // THE CART out front — the moving shield
-    const cx=11;
-    R(cx,2,17,15,body);                                  // red steel cart
-    R(cx,15,17,3,'#7a1e1a');                             // trim
-    R(cx,3,17,3,dark);                                   // char grill slot
-    for(let i=0;i<3;i++) R(cx-6+i*6,4,1.4,1.4,glow);     // coals glowing on the grill
-    R(cx-6,0,3,3,'#1a1620'); R(cx+6,0,3,3,'#1a1620');    // wheels
-    R(cx,17,2.4,12,dark);                                // umbrella pole
-    R(cx,28,13,4,'#e0c040'); R(cx,28,13,1.4,body);       // yellow canopy
-    glowBlob(0,14+drop,3.0);                             // the vendor himself (weak point)
-  }
-  else if(b.arch==='auteur'){
-    const tidy=b.state==='tidy', clap=b.state==='attack'&&b.move==='clap', sweep=(b.state==='attack'||b.state==='wind')&&b.move==='tornado';
-    const lean=tidy?Math.sin(t*0.3)*3:0;                 // fussing back and forth over his spot
-    R(-4,0,5,12,dark); R(4,0,5,12,dark);                 // black slacks
-    R(0,10,15,15,body);                                  // black turtleneck
+  else if(b.arch==='farma'){
+    const crash=b.state==='crash', throwing=b.state==='attack'&&b.move==='throw', inject=(b.state==='wind'||b.state==='attack')&&b.move==='inject';
+    R(-4,0,5,12,dark); R(4,0,5,12,dark);                 // slacks
+    R(0,10,15,15,body);                                  // lab coat
+    R(0,10,15,3,'#2f7a3f');                              // pharma-green trim
     R(0,22,8,7,'#c3a184');                               // face
-    R(-2,25,1.4,1.4,glow); R(2,25,1.4,1.4,glow);         // viewfinder-red eyes
-    R(0,29,11,3,dark); R(0,31,7,2,dark);                 // beret
-    // broom (always in the off hand; doing the work when he sweeps/tidies)
-    const bsw = sweep? 20+Math.sin(b.st*0.4)*8 : tidy? 6+lean : 12;
-    R(-13,4,2,20,'#6a4e2a');                             // broom handle
-    R(-13,2,7,4,'#caa14a');                              // bristles
-    // clapperboard in the near hand
-    if(clap){ R(14+b.st*0.4,16,9,7,'#141418'); R(14+b.st*0.4,16,9,2,'#e8e2d4'); }
-    else { R(11,14,7,6,'#141418'); R(11,14,7,2,'#e8e2d4'); }
-    if(tidy){ ctx.globalAlpha=.4+.4*Math.sin(t*.5); ctx.fillStyle=glow;   // fixated marker over the opening
+    R(-2,25,1.4,1.4,'#1a1620'); R(2,25,1.4,1.4,'#1a1620');   // eyes
+    if(throwing){ R(14+b.st*0.4,16,7,6,'#2fffa8'); }     // pills leaving his hand
+    else if(inject){ R(-11,14,5,10,body); R(-13,18,3,4,'#2fffa8'); }  // syringe to the arm
+    else { R(-11,14,5,8,body); R(11,14,5,8,body); }
+    if(crash){ ctx.globalAlpha=.4+.4*Math.sin(t*.5); ctx.fillStyle=glow;
       ctx.font='bold 10px "JetBrains Mono",monospace'; ctx.textAlign='center';
       ctx.fillText('✦', sx, gy-(b.h+6)*G+bob); ctx.globalAlpha=1; }
-    if(b.buffT>0){ ctx.globalAlpha=.5; ctx.strokeStyle=glow; ctx.lineWidth=1;   // "PERFECT." aura
+    if(b.buffT>0){ ctx.globalAlpha=.5; ctx.strokeStyle=glow; ctx.lineWidth=1;   // strength-buff aura
       ctx.strokeRect(sx-14,gy-b.h*S*G+bob,28,b.h*S*G); ctx.globalAlpha=1; }
     glowBlob(0,15,3.0);                                  // chest (weak point)
   }
-  else if(b.arch==='tourist'){
-    const aiming=b.state==='wind', snap=b.state==='attack'&&b.move==='photo'&&b.st<3;
-    const camUp = aiming||snap||b.state==='recover';
-    R(-5,0,6,9,'#e8e2d4'); R(5,0,6,9,'#e8e2d4');         // white socks/sneakers
-    R(-5,7,6,3,'#c9c2ae'); R(5,7,6,3,'#c9c2ae');
-    R(-5,9,6,9,dark); R(5,9,6,9,dark);                   // cargo shorts (green)
-    R(0,17,16,13,body);                                  // white tee (with a loud print stripe)
-    R(0,20,16,2,'#e0563a'); R(0,24,16,2,'#3a7fd5');
-    R(0,29,9,7,'#e8c9a8');                               // sunburned face
-    R(-2.4,32,1.4,1.4,'#1a1620'); R(2.4,32,1.4,1.4,'#1a1620');   // eyes (behind the cap)
-    R(0,36,11,4,'#d54a44'); R(-5,35,5,2,'#d54a44');      // red baseball cap + brim
-    // camera: down at his chest, or up to his eye when he shoots
-    if(camUp){ R(9,29,7,6,'#22242e'); R(12,30,3,3,glow); // lens toward you
-      if(snap){ glowBlob(14,31,4.2); } }                 // FLASH
-    else { R(3,18,7,5,'#22242e'); R(5,19,3,3,'#3a3f47'); }  // camera hanging on the strap
-    if(aiming){ ctx.globalAlpha=.5+.5*Math.sin(t*.6); ctx.fillStyle=glow;
-      ctx.font='bold 9px "JetBrains Mono",monospace'; ctx.textAlign='center';
-      ctx.fillText('📷', sx, gy-(b.h+4)*G+bob); ctx.globalAlpha=1; }
-    glowBlob(0,17,3.0);                                  // chest (weak point)
-  }
-  else if(b.arch==='lawyer'){
-    const gavel=(b.state==='wind'||b.state==='attack')&&b.move==='gavel';
-    const serve=b.state==='attack'&&b.move==='subpoena'&&b.st<10;
-    const swat =b.state==='attack'&&b.move==='backhand'&&b.st<16;
-    const lock =(b.state==='wind'||b.state==='attack')&&b.move==='lockup';   // reaching to grab / holding the case
-    // gavel arm: cocked high on the wind, hammered down through the attack, resting otherwise
-    const raise= gavel ? (b.state==='wind'? 22+b.st*0.4 : Math.max(-6,22-b.st*2.4)) : 12;
-    R(-4,0,5,12,'#15161c'); R(4,0,5,12,'#15161c');       // pressed suit trousers
-    R(-4,0,6,3,'#0e0e12'); R(4,0,6,3,'#0e0e12');         // oxford shoes
-    R(0,10,15,16,body);                                  // suit jacket
-    R(0,10,4,15,'#e8e2d4');                              // white dress shirt
-    R(0,19,3,6,glow);                                    // power tie (weak-point red)
-    R(-7,15,4,10,body); R(7,15,4,10,body);               // lapels / jacket sides
-    E(0,33,8.5,7,'#161318'); E(-6.5,30,3.8,4.5,'#161318'); E(6.5,30,3.8,4.5,'#161318');  // rounded afro (behind the head)
-    E(0,34,6.5,5,'#241d29');                             // afro sheen
-    R(0,23,9,8,'#5a3b25');                               // deep-brown face
-    R(-2.2,26.5,1.5,1.5,'#120d0a'); R(2.2,26.5,1.5,1.5,'#120d0a');  // eyes
-    // briefcase in the off hand — put away while he's working the grab (it's out front holding you)
-    if(!lock){ R(-12,5,6,8,'#3a2a1a'); R(-12,9,6,1.4,'#caa14a'); }   // case body + brass latch
-    if(lock){                                            // both arms thrust forward for the lockup
-      R(10,16,6,4,body); R(10,12,6,4,body);              // reaching arms
-      if(b.state==='wind'){ R(15,13,9,10,'#3a2a1a'); R(15,13,9,2,'#2a1e12'); R(15,12,9,2,'#caa14a'); }  // open case, telegraph
-    }
-    // gavel in the near hand (tucked away during the grab)
-    if(!lock){
-      R(11,10+raise,2,10,'#6a4e2a');                     // handle
-      R(11,18+raise,8,5,'#8a6a3a'); R(11,18+raise,8,1.6,'#5a3f22');   // mallet head + band
-    }
-    if(serve) R(13,20,6,7,'#efe9d8');                    // a subpoena leaving his hand
-    if(swat){ R(13,16,7,8,'#3a2a1a'); R(13,16,7,1.4,'#caa14a'); }   // briefcase mid-backhand
-    if(gavel&&b.state==='wind'){ ctx.globalAlpha=.5+.5*Math.sin(t*.6); ctx.fillStyle=glow;   // slam telegraph
+  else {                                                 // president
+    const shove=b.state==='attack', incoming=b.state==='incoming'||b.state==='strike';
+    R(-5,0,6,13,'#0e1830'); R(5,0,6,13,'#0e1830');       // suit pants
+    R(0,11,18,16,body);                                  // navy suit jacket
+    R(0,20,20,4,dark);                                   // shoulders
+    R(0,26,9,8,'#c9a37a');                               // face
+    R(-2.4,30,1.6,1.6,'#1a1620'); R(2.4,30,1.6,1.6,'#1a1620');   // eyes
+    R(0,19,3,10,glow);                                   // red tie
+    if(shove){ R(14,4,9,5,dark); } else { R(-11,15,5,8,body); R(11,15,5,8,body); }
+    if(b.finalPhase){ ctx.globalAlpha=.5+.5*Math.sin(t*.5); ctx.fillStyle='#ff2e88';
       ctx.font='bold 10px "JetBrains Mono",monospace'; ctx.textAlign='center';
-      ctx.fillText('⚖', sx, gy-(b.h+6)*S*G+bob); ctx.globalAlpha=1; }
-    if(lock&&b.state==='wind'){ ctx.globalAlpha=.5+.5*Math.sin(t*.7); ctx.fillStyle=glow;   // grab telegraph
-      ctx.font='bold 11px "JetBrains Mono",monospace'; ctx.textAlign='center';
-      ctx.fillText('⚖', sx, gy-(b.h+6)*S*G+bob); ctx.globalAlpha=1; }
-    glowBlob(0,19,3.0);                                  // tie knot / chest (weak point)
-  }
-  else {                                                 // crawler
-    ctx.strokeStyle=dark; ctx.lineWidth=2.2*S*G;
-    for(let i=0;i<b.legs;i++){ const side=i%2?1:-1, idx=Math.floor(i/2);
-      const ph=Math.sin(t*.2+i*0.9)*3;
-      const hipx=sx+(-2+idx*2)*f*S, hipy=gy-10*S*G+bob;
-      const kneex=hipx+side*(10+idx*3)*S, kneey=gy-(12+ph)*S*G+bob;
-      const footx=hipx+side*(16+idx*4)*S, footy=gy-1*S*G;
-      ctx.beginPath(); ctx.moveTo(hipx,hipy); ctx.lineTo(kneex,kneey); ctx.lineTo(footx,footy); ctx.stroke(); }
-    ctx.fillStyle=body; ctx.beginPath(); ctx.ellipse(sx-f*10*S, gy-11*S*G+bob, 12*S, 10*S*G,0,0,7); ctx.fill();
-    ctx.fillStyle=dark;  ctx.beginPath(); ctx.ellipse(sx-f*10*S, gy-11*S*G+bob, 12*S, 10*S*G,0,-0.5,3.6); ctx.fill();
-    glowBlob(-10,11,4.6);                                // abdomen (weak point)
-    R(7,7,11,9,body);                                    // cephalothorax
-    for(let i=0;i<4;i++) R(9+(i%2)*2.4, 12-(i>1?2:0), 1.4,1.4, glow);   // eye cluster
-    R(14,7,4,3,dark);                                    // mandibles
-    if(winding&&b.move==='stab') glowBlob(12,10,2.6);
+      ctx.fillText('✦', sx, gy-(b.h+6)*G+bob); ctx.globalAlpha=1; }
+    else if(incoming){ ctx.globalAlpha=.4+.4*Math.sin(t*.6); ctx.fillStyle=glow;
+      ctx.font='bold 9px "JetBrains Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText('⚠', sx, gy-(b.h+4)*G+bob); ctx.globalAlpha=1; }
+    glowBlob(0,15,3.0);                                  // chest (weak point)
   }
 
   if(b.state==='wind'){ ctx.globalAlpha=.5+.5*Math.sin(t*.5); ctx.fillStyle='#ff5a2e';
@@ -2909,13 +2530,18 @@ function drawBossBar(){
   if(b.flash>0){ ctx.fillStyle='#fff'; ctx.globalAlpha=b.flash/8; ctx.fillRect(bx,by+1,bw,5); ctx.globalAlpha=1; }
   ctx.fillStyle='rgba(11,10,16,.5)'; for(let i=1;i<20;i++) ctx.fillRect(bx+bw/20*i,by+1,1,5);
   ctx.strokeStyle=b.pal.glow; ctx.lineWidth=1; ctx.strokeRect(bx-2.5,by+0.5,bw+5,6);
-  if(b.arch==='deli'){                       // tell the player why he won't take damage
-    let note='';
-    if(b.phase==='guard') note='SHIELDED — CLEAR THE HENCHMEN';
-    else if(b.phase==='gun') note = b.state==='reload'?'RELOADING — HIT HIM NOW':'STRAPPED — DODGE THE SPRAY';
-    if(note){ ctx.fillStyle= b.state==='reload'?'#3ad1ff':'#ffb03a';
-      ctx.font='6px "JetBrains Mono",monospace'; ctx.textAlign='center';
-      ctx.fillText(note, W/2, by+15); } }
+  if(b.arch==='landlord' && b.phase==='guard'){          // tell the player why he won't take damage
+    ctx.fillStyle='#ffb03a'; ctx.font='6px "JetBrains Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('SHIELDED — CLEAR HIS SECURITY', W/2, by+15);
+  }
+  if(b.arch==='president' && (b.state==='incoming'||b.state==='strike')){
+    ctx.fillStyle='#ff2e88'; ctx.font='6px "JetBrains Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('MISSILE STRIKE — MOVE!', W/2, by+15);
+  }
+  if(b.finalPhase){
+    ctx.fillStyle='#3ad1ff'; ctx.font='6px "JetBrains Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('ONE PUNCH FINISHES HIM', W/2, by+15);
+  }
 }
 
 function drawFires(){
@@ -2925,10 +2551,6 @@ function drawFires(){
     if(f.weapon==='pipe'){ ctx.fillStyle=w.col; ctx.fillRect(-9,-2,18,4); ctx.fillStyle=w.dark; ctx.fillRect(-9,-2,3,4); ctx.fillRect(6,-2,3,4); }
     else { ctx.fillStyle=w.col; ctx.fillRect(-3,-6,6,12); ctx.fillStyle=w.dark; ctx.fillRect(-2,-8,4,3); ctx.fillStyle='#e8e2d4'; ctx.fillRect(-3,-1,6,2); }
     ctx.restore(); }
-  // solid bullets (the deli's handgun) — drawn straight, not additive
-  for(const f of fires){ if(!f.bullet) continue; const bx=f.x-camX, by=f.z-f.y;
-    ctx.fillStyle='#ffd23a'; ctx.fillRect(bx-4,by-2,8,4);      // tracer streak
-    ctx.fillStyle='#fff'; ctx.fillRect(bx-1,by-1.5,3,3); }     // hot core
   // plasma balls (the dark form's ranged lob) — a pulsing white-hot core in a magenta glow, trailing embers
   for(const f of fires){ if(!f.plasma) continue; const bx=f.x-camX, by=f.z-f.y;
     const pulse=0.7+0.3*Math.sin(t*0.6+f.x*0.3);
@@ -2940,117 +2562,36 @@ function drawFires(){
     ctx.globalAlpha=0.35; ctx.fillStyle='#ff2eea';
     ctx.beginPath(); ctx.ellipse(bx-f.vx*1.4,by-f.vz*1.4,4,4,0,0,7); ctx.fill();   // short trailing ember
     ctx.restore(); }
-  // sizzling skewers (the cart man) — a tumbling stick of charred meat + veg
-  for(const f of fires){ if(!f.skewer) continue; const bx=f.x-camX, by=f.z-f.y;
-    ctx.save(); ctx.translate(bx,by); ctx.rotate(f.z*0.4+t*0.3);
-    ctx.fillStyle='#8a6a3a'; ctx.fillRect(-7,-1,14,2);         // the skewer
-    ctx.fillStyle='#a83c3c'; ctx.fillRect(-4,-2.5,3,5);        // meat
-    ctx.fillStyle='#4faa4a'; ctx.fillRect(0,-2.5,2.5,5);       // pepper
-    ctx.fillStyle='#e0c040'; ctx.fillRect(3,-2,2.5,4);         // onion
-    ctx.restore();
-    ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.5;   // heat shimmer off it
-    ctx.drawImage(fireC, bx-6, by-8, 12,12); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; }
-  // clapperboards (the auteur) — a spinning 🎬 slate
+  // pills/syringes (B.I.G. Farma) — a spinning capsule
   for(const f of fires){ if(!f.clap) continue; const bx=f.x-camX, by=f.z-f.y;
     ctx.save(); ctx.translate(bx,by); ctx.rotate(Math.sin(t*0.4)*0.5);
-    ctx.fillStyle='#141418'; ctx.fillRect(-8,-6,16,12);        // slate body
-    ctx.fillStyle='#e8e2d4'; ctx.fillRect(-8,-6,16,3);         // white top strip
-    for(let i=0;i<4;i++){ ctx.fillStyle=i%2?'#141418':'#e8e2d4'; ctx.fillRect(-8+i*4,-8,4,3); }  // diagonal clapper teeth
-    ctx.fillStyle='#e23b3b'; ctx.fillRect(-6,0,3,3);           // red action dot
+    ctx.fillStyle='#2fffa8'; ctx.fillRect(-8,-4,8,8);          // capsule half
+    ctx.fillStyle='#e8e2d4'; ctx.fillRect(0,-4,8,8);           // capsule other half
     ctx.restore(); }
-  // subpoenas (the lawyer) — a served sheet tumbling end over end
+  // eviction notices (Landlord D. Evict) — a served sheet tumbling end over end
   for(const f of fires){ if(!f.paper) continue; const bx=f.x-camX, by=f.z-f.y;
     ctx.save(); ctx.translate(bx,by); ctx.rotate((f.spin||0)+t*0.35);
     ctx.fillStyle='#efe9d8'; ctx.fillRect(-6,-8,12,16);       // the sheet
     ctx.fillStyle='#b3aa98'; for(let i=0;i<4;i++) ctx.fillRect(-4,-6+i*3,8,1);   // lines of text
-    ctx.fillStyle='#e0483a'; ctx.fillRect(-4,4,5,3);          // red court stamp
+    ctx.fillStyle='#c9d13a'; ctx.fillRect(-4,4,5,3);          // eviction stamp
     ctx.restore(); }
-  // gavel shockwaves (the lawyer) — a low ring skimming the pavement
-  for(const f of fires){ if(!f.shock) continue; const bx=f.x-camX, by=f.z;
-    ctx.globalAlpha=clamp(f.life/44,0,1)*0.75; ctx.strokeStyle='#e8dcb0'; ctx.lineWidth=3;
-    ctx.beginPath(); ctx.ellipse(bx,by,f.r,f.r*0.4,0,0,7); ctx.stroke();
-    ctx.globalAlpha=clamp(f.life/44,0,1)*0.4; ctx.strokeStyle='#e0483a'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.ellipse(bx,by,f.r+3,(f.r+3)*0.4,0,0,7); ctx.stroke();
-    ctx.globalAlpha=1; }
   ctx.globalCompositeOperation='lighter';
-  for(const f of fires){ if(f.bullet||f.skewer||f.clap||f.tornado||f.paper||f.shock||f.weapon) continue; const a=clamp(f.life/22,0,1)*.85;
+  for(const f of fires){ if(f.clap||f.paper||f.weapon) continue; const a=clamp(f.life/22,0,1)*.85;
     ctx.globalAlpha=a; ctx.drawImage(fireC, f.x-camX-f.r, f.z-f.y-f.r*.9, f.r*2, f.r*2); }
   ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
-  // broom tornadoes (the auteur) — a swirling grey funnel of swept-up street trash
-  for(const f of fires){ if(!f.tornado) continue; const bx=f.x-camX, by=f.z-f.y, sp=f.spin||0;
-    for(let i=0;i<7;i++){ const u=i/6, wob=Math.sin(sp+i*1.1)*f.r*(0.3+u*0.7);
-      ctx.globalAlpha=0.28+0.10*Math.sin(sp*2+i);
-      ctx.fillStyle= i%2?'#6b6478':'#4a4654';
-      const rw=f.r*(0.25+u*0.9);
-      ctx.fillRect(bx+wob-rw, by-6-i*7, rw*2, 6); }
-    ctx.globalAlpha=1;
-    ctx.fillStyle='#8b8496'; for(let i=0;i<5;i++){ const a2=sp*3+i*1.3;   // flecks of debris orbiting
-      ctx.fillRect(bx+Math.cos(a2)*f.r, by-8-((sp*4+i*9)%46), 2,2); } }
 }
 
-// the subway train — a full-width car barreling down the back rail during a TRACK WORKER fight
-function drawTrain(){
-  const b=boss; if(!b||b.arch!=='subway') return;
-  if(b.state==='retreat'){                         // warning: headlight glow from the side it's coming
-    const side=b.trainX<camLock+W/2?0:W;
-    ctx.save(); ctx.globalCompositeOperation='lighter';
-    ctx.globalAlpha=.3+.3*Math.sin(t*.6); ctx.fillStyle=b.pal.glow;
-    ctx.beginPath(); ctx.ellipse(side, FLOOR_N-4, 90,40,0,0,7); ctx.fill(); ctx.restore();
-    return; }
-  if(b.state!=='train') return;
-  const tx=b.trainX-camX, ty=FLOOR_N-4, len=200, dir=Math.sign(b.trainX-(camLock+W/2))||1;
-  ctx.save();
-  ctx.fillStyle='#1b1e24'; ctx.fillRect(tx-len/2, ty-48, len, 60);      // car body
-  ctx.fillStyle='#2a2f38'; ctx.fillRect(tx-len/2, ty-48, len, 5);       // roof
-  ctx.fillStyle='#3a3f47'; ctx.fillRect(tx-len/2, ty+8, len, 5);        // skirt
-  for(let i=0;i<6;i++){ ctx.fillStyle='#ffe9a0'; ctx.globalAlpha=.85;
-    ctx.fillRect(tx-len/2+16+i*32, ty-38, 20, 16); }                    // lit windows
-  ctx.globalAlpha=1;
-  // headlight on the leading face + speed streaks
-  ctx.globalCompositeOperation='lighter'; ctx.fillStyle=b.pal.glow; ctx.globalAlpha=.8;
-  ctx.beginPath(); ctx.ellipse(tx+dir*(len/2+10), ty-16, 26,20,0,0,7); ctx.fill();
-  ctx.globalAlpha=.25; for(let i=0;i<5;i++) ctx.fillRect(tx-dir*(len/2+i*30), ty-40, 18,52);
-  ctx.restore(); ctx.globalAlpha=1;
-}
-
-// the tour bus — parks across the back of the street for a TOURIST fight (a long backdrop)
-function drawBus(){
-  const b=boss; if(!b||b.arch!=='tourist') return;
-  const bx=b.busX-camX, by=FLOOR_N-6, len=320, h=54;
-  ctx.save();
-  ctx.fillStyle='#e6c23a'; ctx.fillRect(bx-len/2, by-h, len, h);          // yellow bus body
-  ctx.fillStyle='#c9a52c'; ctx.fillRect(bx-len/2, by-8, len, 8);          // lower panel
-  ctx.fillStyle='#2b2f36'; ctx.fillRect(bx-len/2, by-h, len, 6);          // roof trim
-  ctx.fillStyle='#5aa0c8';                                                 // tinted windows
-  for(let i=0;i<9;i++) ctx.fillRect(bx-len/2+14+i*34, by-h+12, 26, 20);
-  ctx.fillStyle='#141822'; ctx.fillRect(bx-len/2+6, by-h+12, 22, 26);     // door
-  ctx.fillStyle='#1a1a20';                                                 // wheels
-  ctx.beginPath(); ctx.arc(bx-len*0.33, by, 9,0,7); ctx.arc(bx+len*0.33, by, 9,0,7); ctx.fill();
-  ctx.fillStyle='#3f8f5a'; ctx.font='bold 11px "Bebas Neue",sans-serif'; ctx.textAlign='center';
-  ctx.fillText('CITY  TOURS', bx, by-h+9);                                 // livery
-  ctx.restore(); ctx.textAlign='left';
-}
-
-// the tourist's viewfinder — the danger box he's about to shoot. leave it before the snap.
-function drawPhotoFrame(){
-  const b=boss; if(!b||b.arch!=='tourist'||b.state!=='wind'||!b.photo) return;
-  const f=b.photo, x=f.x-camX, prog=clamp(b.st/b.windLen,0,1);
-  const L=x-f.rw, Tp=f.z-f.rd, w=f.rw*2, hh=f.rd*2;
-  ctx.save();
-  const inFrame = Math.abs(P.x-f.x)<f.rw && Math.abs(P.z-f.z)<f.rd;
-  ctx.fillStyle = inFrame ? 'rgba(255,60,60,'+(0.10+0.14*Math.sin(t*0.5))+')' : 'rgba(253,244,200,0.06)';
-  ctx.fillRect(L,Tp,w,hh);
-  ctx.strokeStyle=b.pal.glow; ctx.lineWidth=1; ctx.globalAlpha=0.5+0.4*Math.sin(t*0.6);
-  const c=12; // corner brackets
+// the President's missile strike — a closing reticle over the impact zone during the warning
+function drawStrikeWarning(){
+  const b=boss; if(!b||b.arch!=='president'||b.state!=='incoming') return;
+  const x=b.strikeX-camX, y=FLOOR_S-4, prog=clamp(b.st/STRIKE_WARN,0,1), r=60*(1-prog)+10;
+  ctx.save(); ctx.strokeStyle='#ff2e88'; ctx.lineWidth=2; ctx.globalAlpha=0.5+0.4*Math.sin(t*0.6);
+  ctx.beginPath(); ctx.ellipse(x,y,r,r*0.4,0,0,7); ctx.stroke();
+  ctx.globalAlpha=0.7; const c=10;
   ctx.beginPath();
-  ctx.moveTo(L,Tp+c); ctx.lineTo(L,Tp); ctx.lineTo(L+c,Tp);
-  ctx.moveTo(L+w-c,Tp); ctx.lineTo(L+w,Tp); ctx.lineTo(L+w,Tp+c);
-  ctx.moveTo(L+w,Tp+hh-c); ctx.lineTo(L+w,Tp+hh); ctx.lineTo(L+w-c,Tp+hh);
-  ctx.moveTo(L+c,Tp+hh); ctx.lineTo(L,Tp+hh); ctx.lineTo(L,Tp+hh-c);
+  ctx.moveTo(x-r,y); ctx.lineTo(x-r+c,y); ctx.moveTo(x+r,y); ctx.lineTo(x+r-c,y);
+  ctx.moveTo(x,y-r*0.4); ctx.lineTo(x,y-r*0.4+c*0.4); ctx.moveTo(x,y+r*0.4); ctx.lineTo(x,y+r*0.4-c*0.4);
   ctx.stroke();
-  // focus reticle closing in on the snap
-  ctx.globalAlpha=0.7; const r=3+(1-prog)*10;
-  ctx.beginPath(); ctx.moveTo(x-r,f.z); ctx.lineTo(x+r,f.z); ctx.moveTo(x,f.z-r); ctx.lineTo(x,f.z+r); ctx.stroke();
   ctx.restore(); ctx.globalAlpha=1;
 }
 
@@ -3436,7 +2977,6 @@ function render(){
   const sh=shake*OPT.shake;
   if(sh>1) ctx.translate(rnd(-sh,sh),rnd(-sh,sh));
   bg();
-  drawBus();                                     // the tour bus parks across the back of the street
   const list=[];
   for(const cw of crowd) list.push({z:cw.z,f:()=>drawCrowd(cw)});
   for(const c of cans) if(!c.dead) list.push({z:c.z,f:()=>drawCan(c)});
@@ -3471,8 +3011,7 @@ function render(){
   for(const p of parts){ ctx.globalAlpha=clamp(p.life/20,0,1); ctx.fillStyle=p.col;
     ctx.fillRect(p.x-camX,p.z-p.y,2,2); } ctx.globalAlpha=1;
   drawFires();
-  drawTrain();
-  drawPhotoFrame();                              // the tourist's viewfinder telegraph
+  drawStrikeWarning();
   drawLitter();
   drawCars();
   drawBusMob();

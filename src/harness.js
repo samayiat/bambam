@@ -94,7 +94,7 @@ const driver = `
    rat,vamp,connect,hurtPlayer,setShop,buy,spawnWave,tier,stream,update,render,aggro,coopApply,coopBroadcastEnts,coopMirrorEnts,
    tryGrab,grabbable,atCurb,splatInTraffic,dropGrab,launchGrabbed,tossPlayerToStreet,
    throwWeapon,drop, get WEAPONS(){return WEAPONS},
-   genBoss,spawnBoss,updateBoss,killBoss,enrageBoss,hits,atkBox,
+   genBoss,spawnBoss,updateBoss,killBoss,hits,atkBox,
    buyContinue,callItNight,continueCost,
    gainFreedom,gainXp,loseHeart,heavyHitAt,maxComboStep,xpToLevel,
    spawnBusMob,updateBusMob});
