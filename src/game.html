@@ -2050,20 +2050,24 @@ function bg(){
   const prog=P.x*0.0003, warm=0.5+0.5*Math.sin(prog);
   const sunX=W*0.5+Math.sin(prog)*W*0.8;
   // buildings + the opaque backdrop rect cover everything below y~118, so the whole
-  // blend has to happen above that line to actually be visible
-  const skyTop=lerpHex('#1f7fe0','#3fa0e0',warm), skyMid=lerpHex('#5cc2f0','#8fd0e8',warm);
-  const skyWarm=lerpHex('#ff9d5c','#ffbf6e',warm), skyHz=lerpHex('#ff7a54','#ffab6e',warm);
-  const g=ctx.createLinearGradient(sunX-280,0,sunX+280,120);   // diagonal, not flat vertical — reads as a horizon, not a wall
-  g.addColorStop(0,skyTop); g.addColorStop(.32,skyMid); g.addColorStop(.68,skyWarm); g.addColorStop(1,skyHz);
+  // blend has to happen above that line to actually be visible. A plain vertical gradient
+  // (rather than a diagonal one anchored to sunX) stays uniform across the full width —
+  // a diagonal gradient clamps to its end color past its vector, which read as a hard,
+  // uneven seam whenever the sun drifted off-center. The horizontal, walking-through-it
+  // feel now comes entirely from the sun disc below, which is free to drift smoothly.
+  const g=ctx.createLinearGradient(0,0,0,150);
+  g.addColorStop(0,   lerpHex('#1c6fd8','#2f7fdc',warm));   // deep blue, zenith
+  g.addColorStop(.18, lerpHex('#4a9de8','#66aee6',warm));
+  g.addColorStop(.36, lerpHex('#8cc7ec','#a8cfe4',warm));
+  g.addColorStop(.52, lerpHex('#d8d4c8','#e8d2c0',warm));   // the soft hazy no-man's-land between blue and orange
+  g.addColorStop(.68, lerpHex('#f2b98a','#ffc9a0',warm));
+  g.addColorStop(.85, lerpHex('#ff9868','#ffb082',warm));
+  g.addColorStop(1,   lerpHex('#ff8060','#ffa070',warm));   // warm horizon
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  // the sun itself, a soft glowing disc drifting with the gradient
-  const sg=ctx.createRadialGradient(sunX,66,4,sunX,66,130);
-  sg.addColorStop(0,'rgba(255,244,214,.6)'); sg.addColorStop(1,'rgba(255,244,214,0)');
-  ctx.fillStyle=sg; ctx.fillRect(0,0,W,140);
-  // a saturated warm haze near the horizon — golden-hour sun bouncing off the block
-  const hz=ctx.createLinearGradient(0,90,0,FLOOR_N);
-  hz.addColorStop(0,'rgba(255,140,90,0)'); hz.addColorStop(.6,'rgba(255,120,80,.18)'); hz.addColorStop(1,'rgba(255,130,90,.28)');
-  ctx.fillStyle=hz; ctx.fillRect(0,90,W,FLOOR_N-90);
+  // the sun itself — a soft glowing disc drifting horizontally as you walk deeper into the level
+  const sg=ctx.createRadialGradient(sunX,74,4,sunX,74,150);
+  sg.addColorStop(0,'rgba(255,250,230,.5)'); sg.addColorStop(.45,'rgba(255,230,190,.20)'); sg.addColorStop(1,'rgba(255,230,190,0)');
+  ctx.fillStyle=sg; ctx.fillRect(0,0,W,150);
 
   // clouds — slow parallax, drifting warmer or cooler with the same cycle as the sky
   ctx.globalAlpha=0.88; ctx.fillStyle=lerpHex('#ffffff','#ffe0c2',warm*0.7);
