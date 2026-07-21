@@ -136,8 +136,8 @@ if(MISSING.length) console.log('ids requested but NOT in markup: '+[...new Set(M
 function scene(name, fn){
   // clear any grab/street residue a prior scene's sim may have left on the player, so scenes stay independent
   try{ const g=globalThis.__G();
-    if(['grab','grabbed','caged','wthrow','punch'].includes(g.P.state)) g.P.state='idle';
-    g.P.grabE=null; g.P.grabbedBy=null; g.P.cageB=null; g.P.weapon=null; }catch(e){}
+    if(['grab','grabbed','caged','wthrow','punch','jump','air','upper'].includes(g.P.state)) g.P.state='idle';
+    g.P.grabE=null; g.P.grabbedBy=null; g.P.cageB=null; g.P.weapon=null; g.P.landHold=0; g.P.y=0; g.P.vy=0; }catch(e){}
   try{ fn(); console.log('  ok    '+name); }
   catch(e){ console.log('  FAIL  '+name+'\n        '+e.constructor.name+': '+e.message+
     '\n        '+(e.stack||'').split('\n')[1].trim()); err=err||e; }

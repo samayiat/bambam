@@ -812,7 +812,7 @@ const P={};
 function reset(){
   Object.assign(P,{x:120,z:245,y:0,vy:0,face:1,hp:8,maxhp:8,freedom:0,maxFreedom:100,xp:0,level:1,bucks:500,
     state:'idle',st:0,step:0,buf:0,connected:false,hitDone:false,iframes:0,
-    dmgMul:1,dmgT:0,fireT:0,hitFlash:0,airT:0,deaths:0,gunMode:true,airPunch:false,
+    dmgMul:1,dmgT:0,fireT:0,hitFlash:0,airT:0,deaths:0,gunMode:true,airPunch:false,landHold:0,
     stepV:0,downT:0,knockV:0,weapon:null,grabE:null,grabbedBy:null,downed:false});
   U={spirit:0,hands:0,body:0,chin:0,hustle:0,flow:0,insight:0,boots:0,reach:0,knuck:0,hide:0,second:0,pockets:0}; burgerCost=25;
 
@@ -1674,11 +1674,13 @@ function slamDown(e){                                       // a thrown enemy la
 function hurtPlayer(dmg,fromX){
   if(P.iframes>0||OPT.inv||P.state==='caged'||P.state==='grabbed') return;   // caged/grabbed handle their own damage
   if(P.state==='grab' && P.grabE){ dropGrab(24); say(P.x,P.z-30,'BROKEN!','#ff2e88'); }   // hit mid-windup → the grab breaks, you eat it
+  const armored = P.landHold>0;                  // super armor while frozen in a landing pose — eats the hit, doesn't flinch
   const full=loseHeart(dmg);                     // HIDE thickens your skin; a heavy hit costs a full heart, a light one costs half
-  P.iframes=42; P.hitFlash=16; shake=4; hitstop=4; P.state='idle'; P.step=0; P.st=0; P.buf=0;
-  rumble(200,.95,.5,true);
-  P.face=fromX>P.x?1:-1; P.x-=Math.sign(fromX-P.x)*10;
+  P.hitFlash=16; shake=4; hitstop=4; rumble(200,.95,.5,true);
   puff(P.x,P.z,50,5,'#ff2e88'); blip(90,.08);
+  if(armored){ say(P.x,P.z-30,'ARMOR','#ffd23a'); return; }   // no iframes/state-interrupt/knockdown — the pose holds
+  P.iframes=42; P.state='idle'; P.step=0; P.st=0; P.buf=0;
+  P.face=fromX>P.x?1:-1; P.x-=Math.sign(fromX-P.x)*10;
 
   // a full-heart hit puts you on the pavement
   if(full){
@@ -1755,7 +1757,8 @@ function update(){
   if(pad&&pad.PAUSE) setPause(true);
 
   //---- PUNCH: mash to combo. player is LOCKED for the whole string.
-  if(P.state==='punch'){
+  if(P.landHold>0){ /* frozen in the landing pose — see the landHold countdown further down */ }
+  else if(P.state==='punch'){
     const s=cStep(); P.st++;
     if(P.st===s.su) P.stepV=P.face*s.step;          // he steps into it
     if(P.stepV){ P.x+=P.stepV; P.stepV*=0.72; if(Math.abs(P.stepV)<0.12) P.stepV=0; }
@@ -1906,7 +1909,14 @@ function update(){
     P.state='air'; P.airPunch=jKick?false:true; P.st=0; P.hitDone=false; P.vy=Math.min(P.vy,0.5); }
   if(P.y>0||P.vy>0){ P.airT++; P.y+=P.vy; P.vy-=(P.state==='air'?0.44:0.32);
     if(P.y<=0){ P.y=0;P.vy=0;
-      if(P.state==='air'||P.state==='upper'){shake=Math.max(shake,3); puff(P.x,P.z,6,7,'#6b6478'); rumble(220,.85,.4,true);} P.state='idle'; } }
+      // hold on the landing pose for a beat instead of snapping straight to idle — jump/air/upper
+      // all end on a dedicated "just touched down" frame (hero.jump.3, the punch/kick set's last
+      // frame, hero.uppercut.3) that reads wrong if it's skipped past instantly
+      if(P.state==='jump'||P.state==='air'||P.state==='upper'){
+        shake=Math.max(shake,3); puff(P.x,P.z,6,7,'#6b6478'); rumble(220,.85,.4,true); P.landHold=60;
+      } else P.state='idle';
+    } }
+  if(P.landHold>0 && P.y===0){ P.landHold--; if(P.landHold<=0) P.state='idle'; }   // runs even while y===0 skips the block above
 
   P.z=clamp(P.z,FLOOR_N,ROAD_TARGET+4);   // the whole block is walkable — sidewalk AND road, no curb line
   P.x=clamp(P.x, camLock!==null?camLock+16:8, camLock!==null?camLock+W-24:Infinity);
@@ -2912,14 +2922,21 @@ function drawPlayer(){
   let drawFace=P.face;   // normally P.face; overridden to +1 for the dedicated left-facing (un-mirrored) uppercut frame
   if(P.state==='walk') key='hero.walk.'+(Math.floor(t*.16)%4);
   if(P.state==='idle') key='hero.rot.east';
-  if(P.state==='jump') key='hero.jump.'+clamp(Math.floor(P.airT/9),0,3);   // 0 push-off, 1 rise, 2 peak, 3 fall/land
+  // driven off real height/velocity, not elapsed ticks — the old airT/9 formula reached the
+  // landing-crouch frame partway through the arc, well before he was actually near the ground
+  if(P.state==='jump'){
+    if(P.airT<3) key='hero.jump.0';            // push-off, just the launch instant
+    else if(P.vy>0) key='hero.jump.1';         // rising
+    else if(P.y>14) key='hero.jump.2';         // falling, still well off the ground
+    else key='hero.jump.3';                    // about to touch down — crouch only now
+  }
   if(P.state==='imagine') key= IDX['hero.swag.0'] ? 'hero.swag.'+(Math.floor(t*.4)%4) : 'hero.rot.east';
   if(P.state==='air') key= P.airPunch ? 'hero.punch.'+clamp(2+Math.floor(P.st/3),2,5)           // dive punch (reuses the punch set's extend frames)
                           : (IDX['hero.kick.0'] ? 'hero.kick.'+clamp(Math.floor(P.st/3),0,3)    // drop kick
                                                 : 'hero.jump.3');
   if(P.state==='upper'){
     if(IDX['hero.uppercut.0']){
-      const uf = (P.st<3?0:P.vy>1.0?1:P.vy>-2?2:3);   // crouch → rising fist → BAM → land
+      const uf = P.landHold>0 ? 3 : (P.st<3?0:P.vy>1.0?1:P.vy>-2?2:3);   // crouch → rising fist → BAM → land (landHold forces the true landing frame — vy=0 while frozen would otherwise land on the BAM index)
       if(uf===2 && P.face<0 && IDX['hero.uppercutL.2']){ key='hero.uppercutL.2'; drawFace=1; }  // face left: use the pre-drawn left BAM so the lettering isn't mirrored
       else key='hero.uppercut.'+uf;
     } else key='hero.jump.2';
@@ -3000,7 +3017,7 @@ function drawRemotePlayer(o, pos, idx){
   let key = 'hero.rot.east';
   switch(pos.state){
     case 'walk':  key='hero.walk.'+(Math.floor(t*0.16)%4); break;
-    case 'jump':  key='hero.jump.'+clamp(Math.floor(pos.y/16),0,3); break;
+    case 'jump':  key='hero.jump.'+clamp(3-Math.floor(pos.y/16),0,3); break;   // low near the ground (crouch), high mid-air (rising/tucked) — no vy synced, so push-off/landing share a frame
     case 'air':   key= IDX['hero.kick.0'] ? 'hero.kick.'+(pos.y>20?1:2) : 'hero.jump.3'; break;   // drop kick
     case 'upper': key= IDX['hero.uppercut.0'] ? 'hero.uppercut.'+(pos.y>24?1:pos.y>8?2:3) : 'hero.jump.2'; break;   // uppercut
     case 'imagine': key= IDX['hero.swag.0'] ? 'hero.swag.'+(Math.floor(t*0.4)%4) : 'hero.rot.east'; break;
