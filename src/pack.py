@@ -83,7 +83,8 @@ def pack_one(key, folder, fname, im):
 
 pack_frames("hero.walk", "BamBamRun",      ["frame0.png","frame1.png","frame2.png","frame3.png"])
 pack_frames("hero.punch","BamBamPunch",    ["frame0.png","frame1.png","frame2.png","frame2.png","frame3.png","frame3.png"])
-pack_frames("hero.jab",  "BamBamJab",      ["frame0.png","frame1.png","frame2.png","frame2.png","frame3.png","frame3.png"])  # COMBO's jab/jab-2 steps (sheet:'jab') — dedicated frames instead of the hero.punch fallback
+pack_frames("hero.jab",  "BamBamJab",      ["frame0.png","frame1.png","frame2.png","frame2.png","frame3.png","frame3.png"])  # COMBO's jab step (sheet:'jab') — right hand
+pack_frames("hero.jabL", "BamBamJabL",     ["frame0.png","frame0.png","frame1.png","frame1.png","frame2.png","frame2.png"])  # COMBO's jab-2 step (sheet:'jabL') — left hand; only 3 source frames (idle/extend/recover), no dedicated wind-up, so idle doubles as its own wind-up
 pack_frames("hero.jump", "BamBamJump",     ["frame0.png","frame1.png","frame2.png","frame3.png"])
 # uppercut: crouch/landing are clean (just the character) so foot-anchor them a
 # touch bigger than the normal 46px hero; the two burst frames fill the cell.

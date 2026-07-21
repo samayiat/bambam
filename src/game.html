@@ -850,7 +850,9 @@ const COMBO=[
   {name:'jab',      su:4, act:4, rec:8,  dmg:5,  push:0,   stun:20, y:0,
    sheet:'jab',      wind:[0,1],   hit:[2,3], back:[4,5],   step:1.4, rum:[60,.30,.55]},
   {name:'jab 2',    su:3, act:4, rec:8,  dmg:5,  push:0,   stun:20, y:0,
-   sheet:'jab',      wind:[1],     hit:[2,3], back:[4,5],   step:1.8, rum:[85,.42,.72]},
+   // left hand — sheet:'jabL' gives the combo a right(jab)/left(jab 2)/right(cross,
+   // falls back to hero.punch which is right-handed) alternating rhythm
+   sheet:'jabL',     wind:[1],     hit:[2,3], back:[4,5],   step:1.8, rum:[85,.42,.72]},
   {name:'cross',    su:5, act:5, rec:11, dmg:9,  push:0,   stun:26, y:0,
    sheet:'cross',    wind:[0,1],   hit:[2,3], back:[4,5],   step:2.6, rum:[140,.68,.92]},
   {name:'SWING', su:8, act:6, rec:18, dmg:15, push:9.5, stun:46, y:3.4, launch:true,
