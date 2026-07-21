@@ -2301,6 +2301,11 @@ function bg(){
       ctx.fillStyle='#9a6a1a';
       ctx.fillText(b.name, sx+b.w/2-8, by2+13);
     }
+    // contact shadow — a soft dark gradient where the ground floor meets the sidewalk, so
+    // buildings feel planted instead of floating on a flat fill
+    const aoG=ctx.createLinearGradient(0,FLOOR_N-14,0,FLOOR_N);
+    aoG.addColorStop(0,'rgba(0,0,0,0)'); aoG.addColorStop(1,'rgba(0,0,0,.24)');
+    ctx.fillStyle=aoG; ctx.fillRect(sx,FLOOR_N-14,b.w,14);
     // the doorway is a hole, not a decal — it's where they come from
     const dw=b.kind==='club'?54:40, dx=b.doorX-camX;
     inkRect(dx-dw/2,FLOOR_N-58,dw,58,'#2a2018');
@@ -2334,6 +2339,13 @@ function bg(){
   shadedRect(0,CURB,W,4,'#a8823a',0.35,0.05); ctx.fillStyle=INK; ctx.fillRect(0,CURB,W,1);   // curb lip, lit top face + dark riser
   shadedRect(0,ROAD,W,H-ROAD,'#4a4552',0.08,0.08);                  // asphalt — subtle sheen, it shouldn't gradient much
   ctx.globalAlpha=0.4; ctx.fillStyle=ASPHALT_PAT; ctx.fillRect(0,ROAD,W,H-ROAD); ctx.globalAlpha=1;
+
+  // cloud shadows on the ground — same x-parallax as the clouds above (camX*0.05), so each
+  // patch visibly belongs to the cloud that cast it instead of floating disconnected. Drawn
+  // under the lane dashes/crosswalk/cracks below so those still read crisp on top.
+  for(let i=-1;i<9;i++){ const cx=i*230-(camX*0.05)%230;
+    ctx.fillStyle='rgba(20,16,12,.08)';
+    ctx.beginPath(); ctx.ellipse(cx,(FLOOR_N+H)/2+6,95,(H-FLOOR_N)/2+10,0,0,7); ctx.fill(); }
   // lane dashes — faster fake parallax (not real world position, a stylized sense-of-speed
   // effect), so a dash can coincidentally land on top of a crosswalk below; skip any that would
   const cwCenters=[]; for(let i=0;i<10;i++) cwCenters.push(i*900-camX%900);
@@ -2432,7 +2444,7 @@ function drawLitter(){
   ctx.globalAlpha=1;
 }
 
-function shadow(x,z,r){ ctx.globalAlpha=.34; ctx.fillStyle='#000';
+function shadow(x,z,r){ ctx.globalAlpha=.42; ctx.fillStyle='#000';
   ctx.beginPath(); ctx.ellipse(x-camX,z,r,r*.34,0,0,7); ctx.fill(); ctx.globalAlpha=1; }
 
 function drawCan(c){ const sx=c.x-camX+(c.shake?rnd(-1.5,1.5):0), z=c.z;
@@ -2795,6 +2807,15 @@ function drawPlasmaBeam(){
   ctx.fillStyle='#fff'; ctx.globalAlpha=a*0.9;                                // muzzle flash at his hands
   ctx.beginPath(); ctx.ellipse(sx,sy,10*pulse,10*pulse,0,0,7); ctx.fill();
   ctx.restore(); ctx.globalAlpha=1;
+}
+
+// a soft darkening at the screen edges — cheap, but it's the single biggest lever for making
+// everything in the middle read with more contrast instead of competing evenly with the corners.
+// drawn last, in fixed screen space (after ctx.restore(), so screen-shake doesn't jitter it).
+function vignette(){
+  const g=ctx.createRadialGradient(W/2,H*0.42,H*0.22,W/2,H*0.42,H*0.78);
+  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(10,8,14,.40)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 }
 
 // the President's missile strike — a closing reticle over the impact zone during the warning
@@ -3295,6 +3316,7 @@ function render(){
     ctx.fillStyle=f.col; ctx.fillText(f.txt,f.x-camX,f.z-f.y); } ctx.globalAlpha=1;
   ctx.restore();
   if(camFlash>0){ ctx.fillStyle='rgba(255,255,255,'+clamp(camFlash,0,1)*0.85+')'; ctx.fillRect(0,0,W,H); }  // photo whiteout
+  vignette();
   hud();
 
   composite();
