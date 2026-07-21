@@ -55,8 +55,9 @@ kick** is a drop kick, **jump then punch** a dive attack.
 depending on how hard they land.
 
 **The Freedom Meter** is BamBam's imagination. It fills as you clear out
-enemies who've lost theirs to greed and control, and spending it unleashes an
-exaggerated, cartoon-logic "toon force" attack that can turn a fight around.
+enemies who've lost theirs to greed and control, and spending it unleashes a
+huge imagination-made-literal plasma beam straight out in front of him —
+long range, hits everything in its path, can turn a fight around.
 
 **XP and Bammy Bucks** are the two currencies. XP unlocks new combo strings,
 stronger attacks, movement abilities, and stat increases as you level up.

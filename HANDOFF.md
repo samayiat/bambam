@@ -88,6 +88,17 @@
   extend). It's a solid non-launching hit, distinct from the airborne drop kick (`jump` then
   `kick`, which still uses `art/BamBamKick/` and launches). New harness scene: "standing kick: I
   with feet on the ground connects without launching".
+- **Imagination special is now a plasma gun beam**, not a radius nova — same trigger (`L`/DRINK/B,
+  Freedom Meter full), same `P.state==='imagine'`, but the hit-check (`src/game.html`, `P.st===1`)
+  is now a long forward rectangle (`hits()` box, ~460px + reach, `P.beamFace` locks the direction
+  at the moment it fires so a hit reaction mid-blast can't swing it) instead of a short
+  omnidirectional radius — it only hits what's in front of him now, but at way more range. New
+  `drawPlasmaBeam()` renders it: layered additive-blend glow (outer soft glow → mid saturated
+  cyan → white-hot core, same technique as the robocop dark form's plasma lob in `drawFires()`,
+  just stretched into a beam and tinted electric-blue instead of magenta so the two read as
+  clearly different) plus a burst of `puff()` sparks along its length. Fully procedural, no new
+  art. The title screen's idle demo loop already triggers `imagine` periodically, so the beam
+  shows up there too, for free.
 
 Everything above is committed to `main` and green under `node src/harness.js`.
 

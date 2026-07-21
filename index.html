@@ -812,7 +812,7 @@ const P={};
 function reset(){
   Object.assign(P,{x:120,z:245,y:0,vy:0,face:1,hp:8,maxhp:8,freedom:0,maxFreedom:100,xp:0,level:1,bucks:500,
     state:'idle',st:0,step:0,buf:0,connected:false,hitDone:false,iframes:0,
-    dmgMul:1,dmgT:0,fireT:0,hitFlash:0,airT:0,deaths:0,gunMode:true,airPunch:false,landHold:0,
+    dmgMul:1,dmgT:0,fireT:0,hitFlash:0,airT:0,deaths:0,gunMode:true,airPunch:false,landHold:0,beamFace:1,
     stepV:0,downT:0,knockV:0,weapon:null,grabE:null,grabbedBy:null,downed:false});
   U={spirit:0,hands:0,body:0,chin:0,hustle:0,flow:0,insight:0,boots:0,reach:0,knuck:0,hide:0,second:0,pockets:0}; burgerCost=25;
 
@@ -1809,16 +1809,17 @@ function update(){
     if(P.y>0||P.vy>0){ P.y+=P.vy; P.vy-=0.32; if(P.y<=0){P.y=0;P.vy=0;} }
     if(P.downT<=0){ P.state='idle'; P.iframes=Math.max(P.iframes,26); }
   }
-  else if(P.state==='imagine'){                // Imagination attack — a toon-force burst that hits everyone close
+  else if(P.state==='imagine'){                // PLASMA GUN — Freedom Meter's ultimate: a huge forward-firing beam
     P.st++;
     if(P.st===1){
-      const r=70+U.reach*8;
+      P.beamFace=P.face;                        // lock the beam's direction — a hit reaction mid-blast shouldn't swing it
+      const len=460, reach=U.reach*8, b={x:P.x+P.beamFace*(len+reach)/2, z:P.z, rw:(len+reach)/2, rd:30};
       for(const e of ents){ if(e.dead) continue;
-        if(Math.hypot(e.x-P.x,(e.z-P.z)*1.6)>r) continue;
-        connect(e,{name:'imagine',dmg:26,push:8,stun:40,y:2.6,launch:true,rum:[300,1,.9]});
+        if(hits(b,e)) connect(e,{name:'plasma',dmg:30,push:9,stun:44,y:2.8,launch:true,rum:[320,1,.9]});
       }
       P.dmgMul=Math.max(P.dmgMul,1.5); P.dmgT=420; P.fireT=420;
-      shake=Math.max(shake,10); hitstop=Math.max(hitstop,10); rumble(500,1,1,true);
+      shake=Math.max(shake,12); hitstop=Math.max(hitstop,12); rumble(600,1,1,true);
+      for(let i=0;i<20;i++) puff(P.x+P.beamFace*rnd(20,len*0.85), P.z+rnd(-14,14), rnd(10,34), 1, i%2?'#3ad1ff':'#eafcff');
       say(P.x,P.z-40,'IMAGINATION!','#3ad1ff');
     }
     if(P.st>=48) P.state='idle';
@@ -2775,6 +2776,27 @@ function drawFires(){
   ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
 }
 
+// BamBam's Imagination ultimate — a huge plasma beam fired straight out in front of him. Same
+// additive-glow layering as the robocop dark form's plasma lob above, just stretched into a
+// beam and tinted electric-blue/white (instead of magenta) so it reads as his, not theirs.
+function drawPlasmaBeam(){
+  if(P.state!=='imagine' || P.st<1 || P.st>26) return;
+  const ramp=clamp(P.st/4,0,1), fade=clamp(1-(P.st-6)/20,0,1), a=Math.min(ramp,fade);
+  if(a<=0) return;
+  const dir=P.beamFace||P.face, len=460, sx=P.x-camX, sy=P.z-24, ex=sx+dir*len;
+  const pulse=0.75+0.25*Math.sin(t*0.9);
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.lineCap='round';
+  ctx.strokeStyle='#0af0ff'; ctx.globalAlpha=a*0.35*pulse; ctx.lineWidth=32;   // outer glow
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,sy); ctx.stroke();
+  ctx.strokeStyle='#3ad1ff'; ctx.globalAlpha=a*0.6; ctx.lineWidth=15;         // mid beam
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,sy); ctx.stroke();
+  ctx.strokeStyle='#eafcff'; ctx.globalAlpha=a; ctx.lineWidth=5;              // white-hot core
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,sy); ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.globalAlpha=a*0.9;                                // muzzle flash at his hands
+  ctx.beginPath(); ctx.ellipse(sx,sy,10*pulse,10*pulse,0,0,7); ctx.fill();
+  ctx.restore(); ctx.globalAlpha=1;
+}
+
 // the President's missile strike — a closing reticle over the impact zone during the warning
 function drawStrikeWarning(){
   const b=boss; if(!b||b.arch!=='president'||b.state!=='incoming') return;
@@ -3244,6 +3266,7 @@ function render(){
   for(const p of parts){ ctx.globalAlpha=clamp(p.life/20,0,1); ctx.fillStyle=p.col;
     ctx.fillRect(p.x-camX,p.z-p.y,2,2); } ctx.globalAlpha=1;
   drawFires();
+  drawPlasmaBeam();
   drawStrikeWarning();
   drawLitter();
   drawBusMob();
