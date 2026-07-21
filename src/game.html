@@ -2208,27 +2208,34 @@ function bg(){
     ctx.beginPath(); ctx.ellipse(cx-15,cy-3,15,7,0,0,7); ctx.fill(); }
   ctx.globalAlpha=1;
 
-  // far skyline — saturated sunlit silhouettes with colorful glass windows
+  //---- a flat fallback wall color, drawn BEFORE the skyline (not after) so the skyline paints
+  // over it and isn't clipped — this used to sit after the skyline and erase its bottom edge.
+  ctx.fillStyle='#e8d2a0'; ctx.fillRect(0,118,W,FLOOR_N-118);
+
+  // far skyline — saturated sunlit silhouettes with colorful glass windows. Anchored down near
+  // the foreground buildings' own ground floor (not a thin sliver near the top of the sky) so it
+  // visibly fills the gaps between foreground buildings with more buildings, not open sky — the
+  // whole point of this layer existing. Moderate height (not the point of the closeness), a
+  // brisker parallax (0.18->0.26) does the "closer" work instead.
   const SKY_BLD=['#7fa8d9','#8fc9b0','#e0c078','#a8a8e0'];
   const GLASS=['#6fd8ec','#ffcf7a','#ff9fc0'];
-  // parallax factor bumped (0.18->0.30) and buildings grown taller so this layer moves and
-  // reads more like "the block right behind this one" than a distant, disconnected backdrop.
-  for(let i=-1;i<22;i++){ const bx=i*84-(camX*0.30)%84, bh=95+((i*37)%5)*22;
+  const SKY_BASE=FLOOR_N-6;
+  for(let i=-1;i<22;i++){ const bx=i*84-(camX*0.26)%84, bh=80+((i*37)%5)*18;
     const col=SKY_BLD[Math.floor(hsh(i*3.1)*4)];
     // roofline variant — a fresh hsh() offset (i*3.1+9.9) from the color pick above (i*3.1)
     // so shape and color don't always covary; purely i-indexed parallax dressing, no
     // relation to genChunk()/BUILDINGS at all.
     const roofV=Math.floor(hsh(i*3.1+9.9)*3);
-    ctx.fillStyle=col; ctx.fillRect(bx,146-bh,80,bh);
+    ctx.fillStyle=col; ctx.fillRect(bx,SKY_BASE-bh,80,bh);
     ctx.globalAlpha=0.45; ctx.strokeStyle=INK; ctx.lineWidth=1;    // a touch more present than before, still faint next to the foreground ink
-    ctx.strokeRect(Math.round(bx)+0.5,Math.round(146-bh)+0.5,79,bh-1);
+    ctx.strokeRect(Math.round(bx)+0.5,Math.round(SKY_BASE-bh)+0.5,79,bh-1);
     ctx.globalAlpha=1;
-    if(roofV===1){ ctx.fillStyle=shadeHex(col,-0.12); ctx.fillRect(bx+18,146-bh-8,44,8); }        // notch
+    if(roofV===1){ ctx.fillStyle=shadeHex(col,-0.12); ctx.fillRect(bx+18,SKY_BASE-bh-8,44,8); }    // notch
     else if(roofV===2){ ctx.fillStyle=col;                                                         // gable point
-      ctx.beginPath(); ctx.moveTo(bx+28,146-bh); ctx.lineTo(bx+40,146-bh-11); ctx.lineTo(bx+52,146-bh); ctx.closePath(); ctx.fill(); }
+      ctx.beginPath(); ctx.moveTo(bx+28,SKY_BASE-bh); ctx.lineTo(bx+40,SKY_BASE-bh-11); ctx.lineTo(bx+52,SKY_BASE-bh); ctx.closePath(); ctx.fill(); }
     for(let w=0;w<4;w++)for(let h=0;h<Math.floor(bh/18);h++){
       ctx.fillStyle=GLASS[Math.floor(hsh(i*5+w*11+h*3)*3)];
-      ctx.fillRect(bx+9+w*17,154-bh+h*18,5,6); } }
+      ctx.fillRect(bx+9+w*17,SKY_BASE-bh+8+h*18,5,6); } }
   // one bird catching the light, because a still sky reads as a screenshot
   ctx.globalAlpha=(t%140<12)?1:0; ctx.fillStyle='#fff';
   ctx.fillRect((W- (t*0.28)%(W+200))+100, 40+Math.sin(t*0.004)*6, 2,2); ctx.globalAlpha=1;
@@ -2236,26 +2243,18 @@ function bg(){
   //---- facades
   const BLD_COL=['#ffb84d','#5fd0c8','#ff7f9e','#6fb3f0','#c98fe8','#8fd66a'];
   const ROOF_STYLES=['parapet','setback','gable','cornice'];
-  ctx.fillStyle='#e8d2a0'; ctx.fillRect(0,118,W,FLOOR_N-118);
   for(const b of BUILDINGS){
     const sx=b.x-camX; if(sx>W+40||sx+b.w<-40) continue;
     const top=55+Math.floor(hsh(b.x)*7)*11;           // tall, skinny apartment towers — lowered a bit, height still varies a lot
     const groundTop=FLOOR_N-64;                      // ground-floor storefront band, fixed regardless of tower height
     const baseCol=BLD_COL[Math.floor(hsh(b.x*0.7)*BLD_COL.length)];
     const trim=shadeHex(baseCol,-0.4);
-    // the wall silhouette is drawn wider than the building's real footprint (b.w, which still
-    // governs the door/windows/sign below) so it bridges the gap to the next building — a
-    // packed row of party walls instead of daylight between buildings. 36px comfortably clears
-    // genChunk()'s widest gap (8+25=33px); any overshoot is simply painted over when the next
-    // building draws (BUILDINGS is x-ordered), so this can't leave a visible seam either way.
-    // Purely cosmetic — b.x/b.w/doorX (world placement, collision, genChunk()/R()) are untouched.
-    const fillW=b.w+36;
     // one light source (upper-left) across the whole body instead of a flat fill, a faint
     // brick dither on top, then one ink outline around the full silhouette — this trio is
     // most of what makes a shape read as painted volume instead of a flat vector rect.
-    shadedRect(sx,top,fillW,FLOOR_N-top+6, baseCol, 0.2, 0.22);
-    ctx.globalAlpha=0.14; ctx.fillStyle=BRICK_PAT; ctx.fillRect(sx,top,fillW,FLOOR_N-top+6); ctx.globalAlpha=1;
-    inkRect(sx,top,fillW,FLOOR_N-top+6,null);
+    shadedRect(sx,top,b.w,FLOOR_N-top+6, baseCol, 0.2, 0.22);
+    ctx.globalAlpha=0.14; ctx.fillStyle=BRICK_PAT; ctx.fillRect(sx,top,b.w,FLOOR_N-top+6); ctx.globalAlpha=1;
+    inkRect(sx,top,b.w,FLOOR_N-top+6,null);
     // roofline silhouette variety — every building got the exact same flat-top rect before;
     // seeded off b.x*1.3+4.1 (a fresh hsh() offset, independent of every other per-building
     // pick above) so shape doesn't covary with color/height and genChunk()/R() is untouched.
@@ -2267,12 +2266,12 @@ function bg(){
     } else if(roof==='gable'){
       inkPoly([[sx-1,top+1],[sx+b.w/2,top-15],[sx+b.w+1,top+1]], shadeHex(baseCol,0.12));
     } else if(roof==='cornice'){
-      inkRect(sx-5,top-7,fillW+10,9,trim);
+      inkRect(sx-5,top-7,b.w+10,9,trim);
     }
     // trim ledge under the roofline — a lit band + ink line, not a flat strip
-    shadedRect(sx,top,fillW,5, trim, 0.3, 0.1);
-    inkRect(sx,top,fillW,5,null);
-    ctx.fillStyle='rgba(0,0,0,.12)'; ctx.fillRect(sx+fillW-2,top,2,FLOOR_N-top);
+    shadedRect(sx,top,b.w,5, trim, 0.3, 0.1);
+    inkRect(sx,top,b.w,5,null);
+    ctx.fillStyle='rgba(0,0,0,.12)'; ctx.fillRect(sx+b.w-2,top,2,FLOOR_N-top);
     // stacked apartment windows, floor after floor, up to the ground-floor storefront band
     for(let w=0;w<Math.floor(b.w/28);w++)
       for(let h=0; top+10+h*22 < groundTop-6; h++){
@@ -2314,7 +2313,7 @@ function bg(){
     // buildings feel planted instead of floating on a flat fill
     const aoG=ctx.createLinearGradient(0,FLOOR_N-14,0,FLOOR_N);
     aoG.addColorStop(0,'rgba(0,0,0,0)'); aoG.addColorStop(1,'rgba(0,0,0,.24)');
-    ctx.fillStyle=aoG; ctx.fillRect(sx,FLOOR_N-14,fillW,14);
+    ctx.fillStyle=aoG; ctx.fillRect(sx,FLOOR_N-14,b.w,14);
     // the doorway is a hole, not a decal — it's where they come from
     const dw=b.kind==='club'?54:40, dx=b.doorX-camX;
     inkRect(dx-dw/2,FLOOR_N-58,dw,58,'#2a2018');
