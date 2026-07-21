@@ -746,9 +746,12 @@ function genChunk(ci){
     }
   }
   for(let i=0;i<3;i++) GRATES.push({x:x0+R()*CHUNK, z:FLOOR_N+32+R()*(FLOOR_S-FLOOR_N-44), open:0, chunk:ci});
-  // a few breakables, mixed — not a wall of trash cans
+  // a few breakables, mixed — not a wall of trash cans. boxes spilled off a truck belong in
+  // the street, not the sidewalk, so they get the road's z-range (same band the jaywalking
+  // crowd below uses) instead of the sidewalk one everything else spawns in.
   for(let i=0;i<3;i++){ const ty=['can','box','crate','dumpster'][Math.floor(R()*4)];
-    cans.push({id:'c'+ci+'_'+i, x:x0+40+R()*(CHUNK-80), z:FLOOR_N+8+R()*(FLOOR_S-FLOOR_N-16), type:ty,
+    const z = ty==='box' ? CURB+6+R()*(ROAD_TARGET-40-CURB) : FLOOR_N+8+R()*(FLOOR_S-FLOOR_N-16);
+    cans.push({id:'c'+ci+'_'+i, x:x0+40+R()*(CHUNK-80), z, type:ty,
       hp: ty==='box'?1:ty==='dumpster'?3:2, w: ty==='dumpster'?18:11, shake:0, dead:false, chunk:ci}); }
   // street furniture against the storefronts — all procedural now: trees, benches, newsboxes,
   // bikeracks. (hydrant/mailbox/sign dropped with their sprites — the last leftover FATBACK-era
@@ -2233,7 +2236,7 @@ function bg(){
     if(roofV===1){ ctx.fillStyle=shadeHex(col,-0.12); ctx.fillRect(bx+18,SKY_BASE-bh-8,44,8); }    // notch
     else if(roofV===2){ ctx.fillStyle=col;                                                         // gable point
       ctx.beginPath(); ctx.moveTo(bx+28,SKY_BASE-bh); ctx.lineTo(bx+40,SKY_BASE-bh-11); ctx.lineTo(bx+52,SKY_BASE-bh); ctx.closePath(); ctx.fill(); }
-    for(let w=0;w<4;w++)for(let h=0;h<Math.floor(bh/18);h++){
+    if(hsh(i*4.4+5.5)>0.32) for(let w=0;w<4;w++)for(let h=0;h<Math.floor(bh/18);h++){    // blank a third of these too
       ctx.fillStyle=GLASS[Math.floor(hsh(i*5+w*11+h*3)*3)];
       ctx.fillRect(bx+9+w*17,SKY_BASE-bh+8+h*18,5,6); } }
   // one bird catching the light, because a still sky reads as a screenshot
@@ -2272,8 +2275,10 @@ function bg(){
     shadedRect(sx,top,b.w,5, trim, 0.3, 0.1);
     inkRect(sx,top,b.w,5,null);
     ctx.fillStyle='rgba(0,0,0,.12)'; ctx.fillRect(sx+b.w-2,top,2,FLOOR_N-top);
-    // stacked apartment windows, floor after floor, up to the ground-floor storefront band
-    for(let w=0;w<Math.floor(b.w/28);w++)
+    // stacked apartment windows, floor after floor, up to the ground-floor storefront band —
+    // about a third of buildings skip this entirely (a blank brick party-wall/warehouse face,
+    // real enough in a packed block) so the street doesn't read as wall-to-wall glass
+    if(hsh(b.x*2.9+7.7)>0.32) for(let w=0;w<Math.floor(b.w/28);w++)
       for(let h=0; top+10+h*22 < groundTop-6; h++){
         const glass=GLASS[Math.floor(hsh(b.x+w*11+h*3)*3)];
         const wx=Math.round(sx+10+w*28), wy=Math.round(top+10+h*22);
